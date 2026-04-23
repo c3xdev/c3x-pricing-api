@@ -1,0 +1,25 @@
+# Environment
+.env
+!.env.example
+
+# Build artifacts
+/build/
+/c3x-pricing-api
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+*.test
+*.out
+coverage.html
+
+# Go
+vendor/

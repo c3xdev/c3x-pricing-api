@@ -1,0 +1,5 @@
+.git
+*.md
+build/
+e2e/
+.env

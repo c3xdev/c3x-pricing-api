@@ -1,0 +1,169 @@
+[
+  {
+    "productHash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+    "sku": "EC2-M5-4XLARGE-LINUX-SHARED",
+    "vendorName": "aws",
+    "region": "us-east-1",
+    "service": "AmazonEC2",
+    "productFamily": "Compute Instance",
+    "attributes": {
+      "servicecode": "AmazonEC2",
+      "instanceType": "m5.4xlarge",
+      "tenancy": "Shared",
+      "operatingSystem": "Linux",
+      "preInstalledSw": "NA",
+      "licenseModel": "No License required",
+      "capacitystatus": "Used",
+      "currentGeneration": "Yes",
+      "instanceFamily": "General purpose",
+      "vcpu": "16",
+      "memory": "64 GiB",
+      "storage": "EBS only",
+      "networkPerformance": "Up to 10 Gigabit",
+      "processorArchitecture": "64-bit"
+    },
+    "prices": [
+      {
+        "priceHash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4-ondemand001",
+        "purchaseOption": "on_demand",
+        "unit": "Hrs",
+        "USD": "0.7680000000",
+        "startUsageAmount": "0",
+        "endUsageAmount": "",
+        "description": "$0.768 per On Demand Linux m5.4xlarge Instance Hour"
+      }
+    ]
+  },
+  {
+    "productHash": "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5",
+    "sku": "EBS-GP2-STORAGE",
+    "vendorName": "aws",
+    "region": "us-east-1",
+    "service": "AmazonEC2",
+    "productFamily": "Storage",
+    "attributes": {
+      "servicecode": "AmazonEC2",
+      "volumeApiName": "gp2",
+      "volumeType": "General Purpose",
+      "storageMedia": "SSD-backed",
+      "maxVolumeSize": "16 TiB",
+      "maxIopsvolume": "16000",
+      "maxThroughputvolume": "250 MiB/s",
+      "usagetype": "EBS:VolumeUsage.gp2"
+    },
+    "prices": [
+      {
+        "priceHash": "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5-ondemand001",
+        "purchaseOption": "on_demand",
+        "unit": "GB-Mo",
+        "USD": "0.1000000000",
+        "startUsageAmount": "0",
+        "endUsageAmount": "",
+        "description": "$0.10 per GB-month of General Purpose SSD (gp2) provisioned storage"
+      }
+    ]
+  },
+  {
+    "productHash": "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6",
+    "sku": "EBS-IO1-STORAGE",
+    "vendorName": "aws",
+    "region": "us-east-1",
+    "service": "AmazonEC2",
+    "productFamily": "Storage",
+    "attributes": {
+      "servicecode": "AmazonEC2",
+      "volumeApiName": "io1",
+      "volumeType": "Provisioned IOPS",
+      "storageMedia": "SSD-backed",
+      "maxVolumeSize": "16 TiB",
+      "maxIopsvolume": "64000",
+      "usagetype": "EBS:VolumeUsage.piops"
+    },
+    "prices": [
+      {
+        "priceHash": "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6-ondemand001",
+        "purchaseOption": "on_demand",
+        "unit": "GB-Mo",
+        "USD": "0.1250000000",
+        "startUsageAmount": "0",
+        "endUsageAmount": "",
+        "description": "$0.125 per GB-month of Provisioned IOPS SSD (io1) provisioned storage"
+      }
+    ]
+  },
+  {
+    "productHash": "d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1",
+    "sku": "EBS-IO1-IOPS",
+    "vendorName": "aws",
+    "region": "us-east-1",
+    "service": "AmazonEC2",
+    "productFamily": "System Operation",
+    "attributes": {
+      "servicecode": "AmazonEC2",
+      "volumeApiName": "io1",
+      "group": "EBS IOPS",
+      "usagetype": "EBS:VolumeP-IOPS.piops"
+    },
+    "prices": [
+      {
+        "priceHash": "d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1-ondemand001",
+        "purchaseOption": "on_demand",
+        "unit": "IOPS-Mo",
+        "USD": "0.0650000000",
+        "startUsageAmount": "0",
+        "endUsageAmount": "",
+        "description": "$0.065 per provisioned IOPS-month of Provisioned IOPS SSD (io1)"
+      }
+    ]
+  },
+  {
+    "productHash": "e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+    "sku": "LAMBDA-REQUESTS-X86",
+    "vendorName": "aws",
+    "region": "us-east-1",
+    "service": "AWSLambda",
+    "productFamily": "Serverless",
+    "attributes": {
+      "servicecode": "AWSLambda",
+      "group": "AWS-Lambda-Requests",
+      "usagetype": "Request",
+      "groupDescription": "Invocation call for a Lambda function"
+    },
+    "prices": [
+      {
+        "priceHash": "e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2-ondemand001",
+        "purchaseOption": "on_demand",
+        "unit": "Requests",
+        "USD": "0.0000002000",
+        "startUsageAmount": "0",
+        "endUsageAmount": "",
+        "description": "$0.20 per 1M requests"
+      }
+    ]
+  },
+  {
+    "productHash": "f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3",
+    "sku": "LAMBDA-DURATION-X86",
+    "vendorName": "aws",
+    "region": "us-east-1",
+    "service": "AWSLambda",
+    "productFamily": "Serverless",
+    "attributes": {
+      "servicecode": "AWSLambda",
+      "group": "AWS-Lambda-Duration",
+      "usagetype": "Lambda-GB-Second",
+      "groupDescription": "Lambda Duration"
+    },
+    "prices": [
+      {
+        "priceHash": "f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3-ondemand001",
+        "purchaseOption": "on_demand",
+        "unit": "Lambda-GB-Second",
+        "USD": "0.0000166667",
+        "startUsageAmount": "0",
+        "endUsageAmount": "",
+        "description": "$0.0000166667 for every GB-second"
+      }
+    ]
+  }
+]

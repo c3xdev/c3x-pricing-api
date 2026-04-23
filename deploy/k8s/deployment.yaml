@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: c3x-pricing-api
+  namespace: c3x-pricing
+  labels: { app: c3x-pricing-api }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: c3x-pricing-api }
+  template:
+    metadata:
+      labels: { app: c3x-pricing-api }
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/c3xdev/c3x-pricing-api:latest
+          imagePullPolicy: IfNotPresent
+          args: ["serve"]
+          ports:
+            - name: http
+              containerPort: 4000
+          env:
+            - name: ENV
+              value: "production"
+            - name: PORT
+              value: "4000"
+          envFrom:
+            - secretRef: { name: c3x-pricing-secrets }
+          # /healthz is DB-independent (liveness). /readyz pings the DB
+          # (readiness). Splitting them prevents a transient DB blip from
+          # restarting pods.
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits:   { cpu: 500m, memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities: { drop: ["ALL"] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: c3x-pricing-api
+  namespace: c3x-pricing
+spec:
+  selector: { app: c3x-pricing-api }
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

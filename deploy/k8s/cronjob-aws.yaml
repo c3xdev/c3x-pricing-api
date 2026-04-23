@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: c3x-scrape-aws
+  namespace: c3x-pricing
+spec:
+  # Weekly on Sunday 03:00 UTC. AWS bulk price list churns slowly.
+  schedule: "0 3 * * 0"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  startingDeadlineSeconds: 3600
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 7200
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: scrape
+              image: ghcr.io/c3xdev/c3x-pricing-api:latest
+              args: ["scrape", "--vendor", "aws"]
+              envFrom:
+                - secretRef: { name: c3x-pricing-secrets }
+              env:
+                - name: ENV
+                  value: "production"
+                - name: SCRAPE_CONCURRENCY
+                  value: "8"
+              resources:
+                requests: { cpu: 100m, memory: 256Mi }
+                limits:   { cpu: "2",  memory: 1Gi }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                capabilities: { drop: ["ALL"] }
