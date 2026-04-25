@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: c3x-scrape-azure
+  namespace: c3x-pricing
+spec:
+  # Daily at 03:15 UTC. Azure retail prices update frequently.
+  schedule: "15 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  startingDeadlineSeconds: 3600
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 7200
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: scrape
+              image: ghcr.io/c3xdev/c3x-pricing-api:latest
+              args: ["scrape", "--vendor", "azure"]
+              envFrom:
+                - secretRef: { name: c3x-pricing-secrets }
+              env:
+                - name: ENV
+                  value: "production"
+                - name: SCRAPE_CONCURRENCY
+                  value: "8"
+              resources:
+                requests: { cpu: 100m, memory: 256Mi }
+                limits:   { cpu: "2",  memory: 1Gi }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                capabilities: { drop: ["ALL"] }

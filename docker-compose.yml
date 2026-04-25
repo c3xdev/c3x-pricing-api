@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-c3x}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-c3x_pricing}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-c3x} -d ${POSTGRES_DB:-c3x_pricing}"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    command: ["serve"]
+    environment:
+      PORT: "4000"
+      # WARNING: sslmode=disable is acceptable here because the DB is on the
+      # same Docker network. In production, use sslmode=require or verify-full.
+      DATABASE_URL: "postgres://${POSTGRES_USER:-c3x}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-c3x_pricing}?sslmode=disable"
+      API_KEY: ${API_KEY:-}
+      GCP_API_KEY: ${GCP_API_KEY:-}
+      SCRAPE_CONCURRENCY: ${SCRAPE_CONCURRENCY:-4}
+      MAX_BATCH_SIZE: ${MAX_BATCH_SIZE:-500}
+    ports:
+      - "4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:4000/readyz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  pgdata:

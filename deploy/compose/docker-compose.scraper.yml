@@ -1,0 +1,28 @@
+# Compose overlay that adds a daily scraper sidecar. Use with the root compose
+# file:
+#   docker compose -f docker-compose.yml -f deploy/compose/docker-compose.scraper.yml up -d
+services:
+  scraper:
+    build: ../..
+    # Simple cron loop: sleep until 03:00 UTC, run scrape, repeat. No external
+    # cron daemon needed.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        while true; do
+          now=$$(date -u +%s)
+          target=$$(date -u -d "tomorrow 03:00" +%s 2>/dev/null || date -u -v+1d -v3H -v0M -v0S +%s)
+          sleep $$(( target - now ))
+          echo "[scraper] starting $$(date -u)"
+          /app/c3x-pricing-api scrape --vendor all || echo "[scraper] FAILED (exit=$$?)"
+          echo "[scraper] finished $$(date -u)"
+        done
+    environment:
+      DATABASE_URL: "postgres://${POSTGRES_USER:-c3x}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-c3x_pricing}?sslmode=disable"
+      GCP_API_KEY: "${GCP_API_KEY:-}"
+      SCRAPE_CONCURRENCY: "${SCRAPE_CONCURRENCY:-4}"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped

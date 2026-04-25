@@ -1,0 +1,17 @@
+# CODEOWNERS for c3x-pricing-api
+#
+# Every PR needs review from the maintainers group. GitHub will auto-request
+# these reviewers on any changed path. Narrow rules can be added below the
+# catch-all; most-specific wins.
+
+*                       @c3xdev/maintainers
+
+# Security-sensitive paths require a security reviewer in addition to a
+# maintainer. The security group should be a subset of / orthogonal to
+# maintainers.
+/internal/server/       @c3xdev/maintainers @c3xdev/security
+/internal/db/           @c3xdev/maintainers @c3xdev/security
+/internal/config/       @c3xdev/maintainers @c3xdev/security
+/.github/               @c3xdev/maintainers @c3xdev/security
+/deploy/                @c3xdev/maintainers @c3xdev/security
+/migrations*            @c3xdev/maintainers @c3xdev/security
