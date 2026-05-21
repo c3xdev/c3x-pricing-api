@@ -3,7 +3,7 @@ module github.com/c3xdev/c3x-pricing-api
 go 1.25.0
 
 require (
-	github.com/exaring/otelpgx v0.10.0
+	github.com/exaring/otelpgx v0.11.1
 	github.com/graphql-go/graphql v0.8.1
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/prometheus/client_golang v1.23.2
