@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: ghcr.io/c3xdev/c3x-pricing-api:latest
+          image: ghcr.io/c3xdev/c3x-pricing-api:IMAGE_TAG
           imagePullPolicy: IfNotPresent
           args: ["serve"]
           ports:

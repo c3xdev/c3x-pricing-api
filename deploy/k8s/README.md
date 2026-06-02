@@ -15,12 +15,27 @@ Minimal, opinionated manifests for running `c3x-pricing-api` on Kubernetes.
 
 ## Quick start
 
+The manifests reference `ghcr.io/c3xdev/c3x-pricing-api:IMAGE_TAG` as a
+placeholder. Substitute it for a concrete release version (recommended) or for
+`latest` (not recommended for production — no rollback safety, surprise
+upgrades on pod restart).
+
 ```bash
+# 1. Pick a version. Browse https://github.com/c3xdev/c3x-pricing-api/releases
+#    or use the latest tag programmatically:
+VERSION=$(curl -fsSL https://api.github.com/repos/c3xdev/c3x-pricing-api/releases/latest | grep -oE '"tag_name": *"[^"]+' | cut -d'"' -f4)
+echo "Deploying $VERSION"
+
+# 2. Apply with substitution
 kubectl apply -f namespace.yaml
 kubectl apply -f secret.example.yaml  # edit first!
-kubectl apply -f deployment.yaml
-kubectl apply -f cronjob-aws.yaml -f cronjob-azure.yaml -f cronjob-gcp.yaml
+for f in deployment.yaml cronjob-aws.yaml cronjob-azure.yaml cronjob-gcp.yaml; do
+  sed "s|:IMAGE_TAG|:$VERSION|g" "$f" | kubectl apply -f -
+done
 ```
+
+To upgrade, repeat with the new `$VERSION`; `kubectl rollout undo` then
+correctly rolls back to the previously-deployed image.
 
 ## Design notes
 
