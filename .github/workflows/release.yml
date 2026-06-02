@@ -97,7 +97,7 @@ jobs:
 
       - name: Attest SBOM
         continue-on-error: true
-        uses: actions/attest-sbom@v4
+        uses: actions/attest@v4
         with:
           subject-name: ghcr.io/${{ github.repository }}
           subject-digest: ${{ steps.build.outputs.digest }}
