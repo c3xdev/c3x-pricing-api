@@ -19,7 +19,7 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: scrape
-              image: ghcr.io/c3xdev/c3x-pricing-api:latest
+              image: ghcr.io/c3xdev/c3x-pricing-api:IMAGE_TAG
               args: ["scrape", "--vendor", "aws"]
               envFrom:
                 - secretRef: { name: c3x-pricing-secrets }
