@@ -29,7 +29,10 @@ spec:
                 - name: SCRAPE_CONCURRENCY
                   value: "8"
               resources:
-                requests: { cpu: "1", memory: 12Gi }
+                # AWS scraper holds ~410k products in batches (AmazonEC2 dominates).
+                # Limit accommodates peak RSS; request is small so the scheduler
+                # doesn't permanently reserve the burst capacity from the pool.
+                requests: { cpu: "1", memory: 2Gi }
                 limits:   { cpu: "2", memory: 14Gi }
               securityContext:
                 allowPrivilegeEscalation: false

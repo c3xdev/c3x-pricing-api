@@ -29,8 +29,10 @@ spec:
                 - name: SCRAPE_CONCURRENCY
                   value: "8"
               resources:
-                requests: { cpu: "1", memory: 12Gi }
-                limits:   { cpu: "2", memory: 14Gi }
+                # GCP scraper handles ~72k products — an order of magnitude smaller
+                # than AWS/Azure. Tighter envelope reflects that.
+                requests: { cpu: 500m, memory: 1Gi }
+                limits:   { cpu: "2",  memory: 4Gi }
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
