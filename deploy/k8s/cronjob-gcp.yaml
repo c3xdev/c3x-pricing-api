@@ -4,8 +4,8 @@ metadata:
   name: c3x-scrape-gcp
   namespace: c3x-pricing
 spec:
-  # Daily at 03:30 UTC.
-  schedule: "30 3 * * *"
+  # Daily at 04:00 UTC.
+  schedule: "0 4 * * *"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 5
@@ -29,10 +29,11 @@ spec:
                 - name: SCRAPE_CONCURRENCY
                   value: "8"
               resources:
-                requests: { cpu: 100m, memory: 256Mi }
-                limits:   { cpu: "2",  memory: 1Gi }
+                requests: { cpu: "1", memory: 12Gi }
+                limits:   { cpu: "2", memory: 14Gi }
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
                 runAsNonRoot: true
+                runAsUser: 1000
                 capabilities: { drop: ["ALL"] }

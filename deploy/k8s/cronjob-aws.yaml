@@ -29,10 +29,11 @@ spec:
                 - name: SCRAPE_CONCURRENCY
                   value: "8"
               resources:
-                requests: { cpu: 100m, memory: 256Mi }
-                limits:   { cpu: "2",  memory: 1Gi }
+                requests: { cpu: "1", memory: 12Gi }
+                limits:   { cpu: "2", memory: 14Gi }
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
                 runAsNonRoot: true
+                runAsUser: 1000
                 capabilities: { drop: ["ALL"] }
