@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-06-02
+
+### Security
+- Bumped Go toolchain to **go1.25.11** in CI, release workflow, and Dockerfile.
+  Picks up stdlib fixes for [GO-2026-5039](https://pkg.go.dev/vuln/GO-2026-5039)
+  (`net/textproto`) and [GO-2026-5037](https://pkg.go.dev/vuln/GO-2026-5037)
+  (`crypto/x509`). The `v1.0.2` images shipped with `go1.25.10` and remain
+  affected — upgrade to `v1.0.3`. (#22)
+
+### Changed
+- Release workflow uses `actions/attest` instead of the deprecated
+  `actions/attest-sbom`; inputs are identical. (#21)
+
 ## [1.0.2] - 2026-06-02
 
 ### Added
@@ -52,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `sslmode=disable/allow/prefer` rejected in production via strict URL parsing.
 - Security headers, CORS allow-list, request-body cap, and per-IP rate limiting.
 
-[Unreleased]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/c3xdev/c3x-pricing-api/compare/v0.1.0...v1.0.2
 [0.1.0]: https://github.com/c3xdev/c3x-pricing-api/releases/tag/v0.1.0
