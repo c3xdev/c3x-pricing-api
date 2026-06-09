@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-06-09
+
+### Added
+- AWS scraper covers 9 additional services: DAX, MemoryDB, EMR,
+  App Runner, AppSync, Amplify, Cognito, X-Ray, Athena. (Storage
+  Gateway excluded — AWS publishes no bulk-pricing offer file.)
+- Per-service AWS attribute normalisation: SageMaker `instanceType`
+  role-suffix strip, EKS `mode` discriminator (Auto/Classic),
+  Athena `productFamily` backfill.
+- GCP scraper resolves 11 additional services by display name at
+  scrape time (Memorystore, BigQuery, Filestore, Bigtable, Secret
+  Manager, KMS, Artifact Registry, Logging, Spanner, Dataflow,
+  Dataproc). Unresolved names log a warning; the scrape continues.
+- Prometheus metrics: `c3x_products_total{vendor}` gauge (fed from
+  `/status`) and `c3x_graphql_queries_total{result}` counter with
+  ok/empty/error outcomes — `empty` flags CLI filter shapes the
+  database doesn't carry.
+
+### Fixed
+- Azure: Cosmos DB (incl. autoscale/serverless variants), Container
+  Registry, Logic Apps, Key Vault, and Event Hubs Standard-tier rows
+  were dropped by the `isPrimaryMeterRegion` filter and invisible to
+  the CLI; they now ingest.
+
 ## [1.0.3] - 2026-06-02
 
 ### Security
