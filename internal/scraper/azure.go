@@ -38,8 +38,8 @@ func NewAzureScraper(cfg *config.Config) *AzureScraper {
 	}
 }
 
-func (s *AzureScraper) Name() string              { return "Azure" }
-func (s *AzureScraper) FailedServices() int64      { return atomic.LoadInt64(&s.failedServices) }
+func (s *AzureScraper) Name() string          { return "Azure" }
+func (s *AzureScraper) FailedServices() int64 { return atomic.LoadInt64(&s.failedServices) }
 
 // azureServices lists all Azure services to scrape.
 var azureServices = []string{
@@ -310,6 +310,12 @@ func skipPrimaryMeterFilter(item azureItem) bool {
 		return true
 	}
 	switch {
+	// Cosmos DB Standard Provisioned RU has isPrimaryMeterRegion=false
+	// across every region (only the Free Tier entry is primary).
+	// HasPrefix (not exact match) so the "Azure Cosmos DB autoscale" /
+	// "Azure Cosmos DB serverless" product-name variants surface too.
+	case strings.HasPrefix(item.ProductName, "Azure Cosmos DB"):
+		return true
 	case strings.Contains(item.MeterName, "Disk Operations"):
 		return true
 	case strings.HasSuffix(item.ProductName, "Managed Disks") && strings.Contains(item.MeterName, "Disk Transactions"):
@@ -322,6 +328,24 @@ func skipPrimaryMeterFilter(item azureItem) bool {
 	// isPrimaryMeterRegion=false while only the Reservation entry for the
 	// newer "v8" product line is marked as primary.
 	case strings.HasPrefix(item.ProductName, "Virtual Machines"):
+		return true
+	// Container Registry Standard / Basic tier rows are flagged
+	// non-primary across regions; only Premium passes the default
+	// filter. Bypass so all three tiers surface.
+	case strings.HasPrefix(item.ProductName, "Container Registry"):
+		return true
+	// Logic Apps Consumption Actions / Standard plan rows are
+	// non-primary in most regions.
+	case strings.HasPrefix(item.ProductName, "Logic Apps"):
+		return true
+	// Key Vault Operations meter is non-primary across regions; only
+	// HSM Pool Standard B1 is primary, missing the standard Operations
+	// per-10k charge entirely.
+	case strings.HasPrefix(item.ProductName, "Key Vault"):
+		return true
+	// Event Hubs Standard / Premium throughput-unit hour rows are
+	// non-primary in most regions.
+	case strings.HasPrefix(item.ProductName, "Event Hubs"):
 		return true
 	}
 	return false

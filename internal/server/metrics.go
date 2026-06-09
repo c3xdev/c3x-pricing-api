@@ -48,6 +48,30 @@ var (
 		},
 		[]string{"vendor"},
 	)
+
+	// productsTotal exposes the row count of the products table,
+	// partitioned by vendor. Lets operators alert on sudden drops
+	// ("the scraper started returning 0 AWS products") which would
+	// otherwise only surface when a c3x-go user notices empty
+	// estimates.
+	productsTotal = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "c3x_products_total",
+			Help: "Number of priced products currently in the database, by vendor.",
+		},
+		[]string{"vendor"},
+	)
+
+	// graphqlQueriesTotal tracks every GraphQL operation that
+	// reached the resolver layer, partitioned by result. Cheap
+	// alerting surface for "is the API still answering?".
+	graphqlQueriesTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "c3x_graphql_queries_total",
+			Help: "GraphQL queries resolved, partitioned by outcome.",
+		},
+		[]string{"result"}, // "ok" | "empty" | "error"
+	)
 )
 
 // metricsRegistry is the single prometheus registry used by the server. We keep
@@ -60,7 +84,28 @@ func init() {
 		httpRequestDurationSeconds,
 		httpResponseBytesTotal,
 		scrapeRunsLastSuccessSeconds,
+		productsTotal,
+		graphqlQueriesTotal,
 	)
+}
+
+// SetProductsTotal updates the per-vendor product-count gauge.
+// Called by a readiness background refresher so the value tracks
+// the DB on a low-frequency cadence (avoiding a SELECT COUNT(*)
+// on every scrape).
+func SetProductsTotal(vendor string, count int64) {
+	productsTotal.WithLabelValues(vendor).Set(float64(count))
+}
+
+// RecordGraphQLQuery is invoked by the GraphQL resolver after each
+// operation. The result label has three values:
+//
+//	"ok"     — query returned products
+//	"empty"  — query returned an empty result set (often a c3x-go
+//	           filter shape that doesn't match the catalog yet)
+//	"error"  — query returned an upstream error
+func RecordGraphQLQuery(result string) {
+	graphqlQueriesTotal.WithLabelValues(result).Inc()
 }
 
 // recordHTTPMetrics is invoked at the end of each request.

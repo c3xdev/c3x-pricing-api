@@ -9,9 +9,11 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"time"
+	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
+
 	"github.com/c3xdev/c3x-pricing-api/internal/config"
 	"github.com/c3xdev/c3x-pricing-api/internal/db"
 	"golang.org/x/sync/errgroup"
@@ -19,7 +21,13 @@ import (
 
 const awsBaseURL = "https://pricing.us-east-1.amazonaws.com"
 
-// All AWS services needed by the C3X CLI test suite
+// All AWS services needed by the C3X CLI test suite.
+//
+// Service codes are AWS's own offer-index keys. Adding one here makes
+// the scraper pull `pricing.us-east-1.amazonaws.com/offers/v1.0/aws/
+// <code>/current/index.json`. New services land as additional rows in
+// the products table without schema changes — only the scraper
+// awareness gates ingestion.
 var awsServices = []string{
 	// Compute
 	"AmazonEC2",
@@ -29,6 +37,8 @@ var awsServices = []string{
 	"AmazonLightsail",
 	"AmazonElasticBeanstalk",
 	"CodeBuild",
+	"AWSAppRunner",     // App Runner (vCPU/memory hours, build minutes)
+	"ElasticMapReduce", // EMR service charge per-node-hour
 	// Database
 	"AmazonRDS",
 	"AmazonDynamoDB",
@@ -36,7 +46,9 @@ var awsServices = []string{
 	"AmazonRedshift",
 	"AmazonDocDB",
 	"AmazonNeptune",
-	"AmazonES", // OpenSearch/Elasticsearch
+	"AmazonES",       // OpenSearch/Elasticsearch
+	"AmazonDAX",      // DynamoDB Accelerator
+	"AmazonMemoryDB", // MemoryDB for Redis
 	// Storage
 	"AmazonS3",
 	"AmazonEFS",
@@ -44,6 +56,10 @@ var awsServices = []string{
 	"AmazonECR",
 	"AmazonGlacier",
 	"AmazonS3GlacierDeepArchive",
+	// AmazonStorageGateway: AWS does not publish a bulk-pricing
+	// offer file (returns HTTP 404 as of 2026-06-09). Kept in
+	// c3x-go as a STATIC entry with hand-curated $0.01/GB-written
+	// rate — documented in docs/upstream-gaps.md.
 	// Networking
 	"AWSELB",
 	"AmazonVPC",
@@ -54,6 +70,7 @@ var awsServices = []string{
 	"AWSDirectConnect",
 	"AWSNetworkFirewall",
 	"AWSDataTransfer",
+	"AWSAppSync", // AppSync GraphQL (queries, real-time updates)
 	// Messaging & Streaming
 	"AmazonSNS",
 	"AWSQueueService",
@@ -69,13 +86,18 @@ var awsServices = []string{
 	"AWSEvents",
 	"AWSSystemsManager",
 	"AWSBackup",
-	// Security
+	"AWSXRay", // X-Ray (traces recorded/scanned/insights)
+	// Security & Identity
 	"awskms",
 	"CloudHSM",
 	"awswaf",
 	"AWSCertificateManager",
+	"AmazonCognito", // Cognito User Pools (MAUs, M2M tokens)
+	// Developer Tools & Frontend
+	"AWSAmplify", // Amplify Hosting (build minutes, storage, transfer)
 	// Integration & Other
 	"AWSGlue",
+	"AmazonAthena", // per-TB-scanned query pricing (normaliser backfills productFamily)
 	"AWSSecretsManager",
 	"AWSTransfer",
 	"AmazonStates", // Step Functions
@@ -119,8 +141,8 @@ func NewAWSScraper(cfg *config.Config) *AWSScraper {
 	return &AWSScraper{cfg: cfg, client: &http.Client{Transport: transport}, cnyUSDRate: rate}
 }
 
-func (s *AWSScraper) Name() string              { return "AWS" }
-func (s *AWSScraper) FailedServices() int64      { return atomic.LoadInt64(&s.failedServices) }
+func (s *AWSScraper) Name() string          { return "AWS" }
+func (s *AWSScraper) FailedServices() int64 { return atomic.LoadInt64(&s.failedServices) }
 
 // ScrapeWithHandler streams products to the handler in batches, avoiding OOM for large services.
 func (s *AWSScraper) ScrapeWithHandler(ctx context.Context, handler ProductHandler) error {
@@ -249,7 +271,7 @@ func (s *AWSScraper) fetchGzip(ctx context.Context, url string) (io.ReadCloser, 
 // gzipReadCloser wraps a gzip.Reader and the underlying response body so both
 // are closed properly.
 type gzipReadCloser struct {
-	gz       io.ReadCloser
+	gz         io.ReadCloser
 	underlying io.Closer
 }
 
@@ -535,9 +557,19 @@ func (s *AWSScraper) buildProductList(raw *awsRawPricing, serviceCode string) []
 		for k, v := range awsProd.Attributes {
 			attrs[k] = v
 		}
+		// Per-service attribute normalisation (SageMaker instanceType
+		// suffix strip, EKS mode discriminator, Athena productFamily
+		// backfill). Runs before productFamily lookup so an Athena
+		// SKU's derived productFamily flows into the final value.
+		normalizeAWSAttributes(serviceCode, attrs)
 
 		productHash := ProductHash("aws", region, serviceCode, sku)
 		productFamily := normalizeProductFamily(awsProd.ProductFamily)
+		// If the normaliser injected a productFamily into attrs and
+		// the upstream's was empty, prefer the injected value.
+		if productFamily == "" {
+			productFamily = attrs["productFamily"]
+		}
 
 		product := db.Product{
 			ProductHash:   productHash,
@@ -667,4 +699,61 @@ func normalizeProductFamily(family string) string {
 		return mapped
 	}
 	return family
+}
+
+// normalizeAWSAttributes applies per-service attribute transformations
+// that make the upstream data addressable by c3x-go catalog filters.
+// AWS publishes pricing JSON with attribute conventions that vary by
+// service in ways that make exact-match filtering brittle without a
+// small normalization step.
+//
+// The function mutates attrs in place. Backfills are conservative:
+// we only add a derived attribute when the source SKU clearly
+// matches the pattern, never overriding an explicit upstream value.
+func normalizeAWSAttributes(serviceCode string, attrs map[string]string) {
+	switch serviceCode {
+	case "AmazonSageMaker":
+		// SageMaker SKUs encode the component in instanceType
+		// ("ml.c6g.large-Hosting"). Strip the suffix so c3x catalog
+		// queries on `instanceType = "ml.c6g.large"` resolve. The
+		// component lives in its own attribute already.
+		if it := attrs["instanceType"]; it != "" {
+			if idx := strings.IndexByte(it, '-'); idx > 0 {
+				// Only strip if the suffix is capitalised (a role
+				// tag like "Hosting"/"Notebook") — preserves
+				// legitimate hyphens like `ml.p6-b200.48xlarge`.
+				if suffix := it[idx+1:]; len(suffix) > 0 && suffix[0] >= 'A' && suffix[0] <= 'Z' {
+					attrs["instanceType"] = it[:idx]
+				}
+			}
+		}
+
+	case "AmazonEKS":
+		// EKS classic control-plane SKUs and Auto-mode SKUs share
+		// the same product family; add a `mode` attribute derived
+		// from usagetype so catalog filters can target one or the
+		// other.
+		if ut := attrs["usagetype"]; ut != "" && attrs["mode"] == "" {
+			switch {
+			case strings.Contains(ut, "EKS-Auto"):
+				attrs["mode"] = "Auto"
+			case strings.Contains(ut, "AmazonEKS-Hours") ||
+				strings.Contains(ut, "EKS-Cluster") ||
+				strings.Contains(ut, "Cluster-Hours"):
+				attrs["mode"] = "Classic"
+			}
+		}
+
+	case "AmazonAthena":
+		// Athena per-TB-scanned SKUs ship with `productFamily = ""`
+		// because the upstream lists them under a Query operation.
+		// Backfill the family so catalog mappings can pin
+		// `productFamily = "Query"`.
+		if attrs["productFamily"] == "" {
+			if op := attrs["operation"]; strings.HasPrefix(op, "Query") ||
+				strings.Contains(attrs["usagetype"], "DataScannedBytes") {
+				attrs["productFamily"] = "Query"
+			}
+		}
+	}
 }

@@ -296,6 +296,11 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 				if v, ok := vendors[vendor]; ok {
 					v.Products = int64(count)
 					v.Status = "ready"
+					// Feed the Prometheus gauge whenever /status is
+					// polled — monitoring hits this endpoint anyway,
+					// so the gauge tracks reality without a dedicated
+					// background refresher.
+					SetProductsTotal(vendor, int64(count))
 				}
 			}
 		}
@@ -317,6 +322,9 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 						v.Status = "scraping"
 					} else if finishedAt != nil {
 						v.LastScraped = finishedAt.Format(time.RFC3339)
+						if status == "success" {
+							SetScrapeLastSuccess(vendor, *finishedAt)
+						}
 						if time.Since(*finishedAt) > 48*time.Hour {
 							v.Status = "stale"
 						}
@@ -453,10 +461,37 @@ func (s *Server) handleGraphQL(w http.ResponseWriter, r *http.Request) {
 			Context:        ctx,
 		})
 		results[i] = result
+		// Outcome counter for alerting: error / empty / ok.
+		switch {
+		case len(result.Errors) > 0:
+			RecordGraphQLQuery("error")
+		case graphQLResultIsEmpty(result):
+			RecordGraphQLQuery("empty")
+		default:
+			RecordGraphQLQuery("ok")
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	encodeGraphQLResponse(w, results, isBatch)
+}
+
+// graphQLResultIsEmpty reports whether a successful result carried an
+// empty `products` list — the strongest signal that a c3x-go catalog
+// filter shape doesn't match anything in the database. Tracking these
+// separately from errors lets operators alert on "the CLI is asking
+// for products we don't have" without log-diving.
+func graphQLResultIsEmpty(result *gql.Result) bool {
+	data, ok := result.Data.(map[string]interface{})
+	if !ok {
+		return false
+	}
+	products, ok := data["products"]
+	if !ok {
+		return false
+	}
+	list, ok := products.([]interface{})
+	return ok && len(list) == 0
 }
 
 // encodeGraphQLResponse writes the GraphQL response, returning an object for
@@ -826,8 +861,6 @@ func redactSensitiveParams(rawURL string) string {
 	u.RawQuery = q.Encode()
 	return u.String()
 }
-
-
 
 type statusWriter struct {
 	http.ResponseWriter

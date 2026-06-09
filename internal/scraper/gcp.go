@@ -21,17 +21,43 @@ import (
 
 const gcpBaseURL = "https://cloudbilling.googleapis.com/v1"
 
-// Key GCP service IDs
+// Key GCP service IDs known at compile time. Stable IDs that don't
+// rotate — pinning here saves one /services list call per scrape.
+//
+// gcpDiscoverableServices below are looked up by display name on
+// first scrape via the /services list endpoint (the catalog API has
+// no documented stability guarantee on IDs over time so dynamic
+// discovery keeps us self-healing).
 var gcpServices = map[string]string{
-	"Compute Engine":    "6F81-5844-456A",
-	"Cloud SQL":         "9662-B51E-5089",
-	"Cloud Storage":     "95FF-2EF5-5EA1",
+	"Compute Engine":      "6F81-5844-456A",
+	"Cloud SQL":           "9662-B51E-5089",
+	"Cloud Storage":       "95FF-2EF5-5EA1",
 	"Cloud Run Functions": "29E7-DA93-CA13",
-	"Cloud Run":         "152E-C115-5142",
-	"Cloud DNS":         "FA26-5236-B8B5",
-	"Networking":        "E505-1604-58F8",
-	"Cloud Pub/Sub":     "A1E8-BE35-7EBC",
-	"Kubernetes Engine": "CCD8-9BF1-090E",
+	"Cloud Run":           "152E-C115-5142",
+	"Cloud DNS":           "FA26-5236-B8B5",
+	"Networking":          "E505-1604-58F8",
+	"Cloud Pub/Sub":       "A1E8-BE35-7EBC",
+	"Kubernetes Engine":   "CCD8-9BF1-090E",
+}
+
+// gcpDiscoverableServices are looked up by display name from the
+// /services list endpoint at scrape time. Adding a name here closes
+// a c3x v2 STATIC entry without hard-coding an ID that may rotate.
+// Resolved IDs are cached for the duration of a single scrape; cache
+// invalidation is on process restart (cheap relative to the full
+// SKU pull each service triggers).
+var gcpDiscoverableServices = []string{
+	"Cloud Memorystore for Redis",  // capacity hour
+	"BigQuery",                     // on-demand analysis $/TiB
+	"Cloud Filestore",              // Standard tier capacity
+	"Cloud Bigtable",               // node-hour + storage
+	"Secret Manager",               // active version-month
+	"Cloud Key Management Service", // active key version-month
+	"Artifact Registry",            // GB-month storage
+	"Cloud Logging",                // ingestion GB
+	"Cloud Spanner",                // processing-unit / node-hour
+	"Cloud Dataflow",               // worker vCPU + memory hour
+	"Cloud Dataproc",               // service charge per vCPU-hour
 }
 
 type GCPScraper struct {
@@ -44,8 +70,8 @@ func NewGCPScraper(cfg *config.Config) *GCPScraper {
 	return &GCPScraper{cfg: cfg, client: &http.Client{Timeout: 120 * time.Second}}
 }
 
-func (s *GCPScraper) Name() string              { return "GCP" }
-func (s *GCPScraper) FailedServices() int64      { return atomic.LoadInt64(&s.failedServices) }
+func (s *GCPScraper) Name() string          { return "GCP" }
+func (s *GCPScraper) FailedServices() int64 { return atomic.LoadInt64(&s.failedServices) }
 
 func (s *GCPScraper) ScrapeWithHandler(ctx context.Context, handler ProductHandler) error {
 	if s.cfg.GCPAPIKey == "" {
@@ -57,13 +83,32 @@ func (s *GCPScraper) ScrapeWithHandler(ctx context.Context, handler ProductHandl
 		concurrency = 1
 	}
 
+	// Resolve discoverable services by display name → ID. Logs and
+	// continues if any lookup fails (a typo in the display name or
+	// a renamed service shouldn't abort the whole scrape).
+	resolved, err := s.resolveDiscoverableServices(ctx)
+	if err != nil {
+		slog.Warn("service discovery failed; proceeding with hard-coded services only",
+			"vendor", "gcp", "error", err)
+		resolved = nil
+	}
+	// Merge resolved into the static map. Static entries win on
+	// conflict — known-stable IDs are preferred over re-discovered.
+	scrapeTargets := make(map[string]string, len(gcpServices)+len(resolved))
+	for name, id := range resolved {
+		scrapeTargets[name] = id
+	}
+	for name, id := range gcpServices {
+		scrapeTargets[name] = id
+	}
+
 	// Collect Compute Engine products during streaming for machine type synthesis.
 	var computeProducts []db.Product
 	var mu sync.Mutex
 
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(concurrency)
-	for serviceName, serviceID := range gcpServices {
+	for serviceName, serviceID := range scrapeTargets {
 		serviceName, serviceID := serviceName, serviceID
 		g.Go(func() error {
 			slog.Info("scraping service", "vendor", "gcp", "service", serviceName, "service_id", serviceID)
@@ -109,6 +154,76 @@ func (s *GCPScraper) ScrapeWithHandler(ctx context.Context, handler ProductHandl
 	return nil
 }
 
+// resolveDiscoverableServices walks the Cloud Billing Catalog
+// services list and returns displayName → serviceId for each entry
+// in gcpDiscoverableServices. Display names are matched case-
+// insensitively to absorb minor renames.
+//
+// One HTTP call per scrape, paginated by `pageToken`. Returns
+// partial results if pagination fails halfway; the caller logs and
+// continues.
+func (s *GCPScraper) resolveDiscoverableServices(ctx context.Context) (map[string]string, error) {
+	want := make(map[string]struct{}, len(gcpDiscoverableServices))
+	for _, name := range gcpDiscoverableServices {
+		want[strings.ToLower(name)] = struct{}{}
+	}
+
+	out := make(map[string]string, len(want))
+	pageToken := ""
+	for {
+		listURL := fmt.Sprintf("%s/services?key=%s&pageSize=500", gcpBaseURL, s.cfg.GCPAPIKey)
+		if pageToken != "" {
+			listURL += "&pageToken=" + pageToken
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL, nil)
+		if err != nil {
+			return out, err
+		}
+		resp, err := s.client.Do(req)
+		if err != nil {
+			return out, err
+		}
+		body, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return out, fmt.Errorf("GCP services list HTTP %d: %s", resp.StatusCode, string(body))
+		}
+		var page struct {
+			Services []struct {
+				ServiceID   string `json:"serviceId"`
+				DisplayName string `json:"displayName"`
+			} `json:"services"`
+			NextPageToken string `json:"nextPageToken"`
+		}
+		if err := json.Unmarshal(body, &page); err != nil {
+			return out, fmt.Errorf("decode GCP services list: %w", err)
+		}
+		for _, svc := range page.Services {
+			if _, ok := want[strings.ToLower(svc.DisplayName)]; ok {
+				out[svc.DisplayName] = svc.ServiceID
+			}
+		}
+		if page.NextPageToken == "" {
+			break
+		}
+		pageToken = page.NextPageToken
+	}
+
+	// Warn about any unresolved names so future operators can update
+	// gcpDiscoverableServices when GCP renames a service.
+	found := make(map[string]struct{}, len(out))
+	for name := range out {
+		found[strings.ToLower(name)] = struct{}{}
+	}
+	for _, name := range gcpDiscoverableServices {
+		if _, ok := found[strings.ToLower(name)]; !ok {
+			slog.Warn("GCP service display name not resolved (rename or removed?)",
+				"vendor", "gcp", "name", name)
+		}
+	}
+	return out, nil
+}
+
 func (s *GCPScraper) Scrape(ctx context.Context) ([]db.Product, error) {
 	var allProducts []db.Product
 	var mu sync.Mutex
@@ -150,7 +265,7 @@ type gcpPrice struct {
 }
 
 type gcpPricingExpression struct {
-	UsageUnit string          `json:"usageUnit"`
+	UsageUnit   string          `json:"usageUnit"`
 	TieredRates []gcpTieredRate `json:"tieredRates"`
 }
 
@@ -312,10 +427,10 @@ var gcpMachineTypes = map[string]map[string][2]float64{
 		"c2d-standard-2": {2, 8}, "c2d-standard-4": {4, 16}, "c2d-standard-8": {8, 32},
 		"c2d-standard-16": {16, 64}, "c2d-standard-32": {32, 128}, "c2d-standard-56": {56, 224},
 		"c2d-standard-112": {112, 448},
-		"c2d-highmem-2": {2, 16}, "c2d-highmem-4": {4, 32}, "c2d-highmem-8": {8, 64},
+		"c2d-highmem-2":    {2, 16}, "c2d-highmem-4": {4, 32}, "c2d-highmem-8": {8, 64},
 		"c2d-highmem-16": {16, 128}, "c2d-highmem-32": {32, 256}, "c2d-highmem-56": {56, 448},
 		"c2d-highmem-112": {112, 896},
-		"c2d-highcpu-2": {2, 2}, "c2d-highcpu-4": {4, 4}, "c2d-highcpu-8": {8, 8},
+		"c2d-highcpu-2":   {2, 2}, "c2d-highcpu-4": {4, 4}, "c2d-highcpu-8": {8, 8},
 		"c2d-highcpu-16": {16, 16}, "c2d-highcpu-32": {32, 32}, "c2d-highcpu-56": {56, 56},
 		"c2d-highcpu-112": {112, 112},
 	},
