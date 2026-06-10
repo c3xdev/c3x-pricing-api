@@ -1,0 +1,23 @@
+kind         = "aws_sagemaker_notebook_instance"
+display_name = "AWS SageMaker Notebook Instance"
+provider     = "aws"
+
+# STATIC until SageMaker joins the scrape: ml.t3.medium $0.05/hr.
+
+[[dimensions]]
+id       = "notebook_hours"
+label    = "Notebook instance"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = '''
+  default(instance_type, "ml.t3.medium") == "ml.t3.large"   ? 0.10 :
+  default(instance_type, "ml.t3.medium") == "ml.m5.xlarge"  ? 0.23 :
+  default(instance_type, "ml.t3.medium") == "ml.m5.2xlarge" ? 0.461 :
+                                                              0.05
+'''
+
+[fixture]
+attributes = { instance_type = "ml.t3.medium" }
+expected_monthly_cost = 36.5
+exact = true
+last_verified = "2026-06-10"

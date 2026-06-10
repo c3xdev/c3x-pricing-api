@@ -1,0 +1,19 @@
+kind         = "aws_redshiftserverless_workgroup"
+display_name = "AWS Redshift Serverless Workgroup"
+provider     = "aws"
+
+# STATIC: $0.36/RPU-hour (us-east-1), billed only while queries run.
+
+[[dimensions]]
+id       = "rpu_hours"
+label    = "Redshift Processing Units"
+unit     = "RPU-hours"
+quantity = "default(monthly_rpu_hours, 0)"
+rate     = "0.36"
+when     = "default(monthly_rpu_hours, 0) > 0"
+
+[fixture]
+attributes = { monthly_rpu_hours = 100 }
+expected_monthly_cost = 36
+exact = true
+last_verified = "2026-06-10"

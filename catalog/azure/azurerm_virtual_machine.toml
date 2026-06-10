@@ -1,0 +1,22 @@
+kind         = "azurerm_virtual_machine"
+display_name = "Azure Virtual Machine (legacy kind)"
+provider     = "azure"
+
+[mappings.compute]
+service        = "Virtual Machines"
+product_family = "Compute"
+attribute_filters = [
+  { key = "skuName", expr = 'default(vm_size, "Standard_D2s_v5")' },
+]
+
+[[dimensions]]
+id       = "compute_hours"
+label    = "Virtual machine"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("compute")'
+
+[fixture]
+attributes = { vm_size = "Standard_D2s_v5" }
+expected_monthly_cost = 137.24
+tolerance = 0.05

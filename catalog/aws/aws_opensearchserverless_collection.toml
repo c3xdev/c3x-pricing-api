@@ -1,0 +1,27 @@
+kind         = "aws_opensearchserverless_collection"
+display_name = "AWS OpenSearch Serverless Collection"
+provider     = "aws"
+
+# STATIC: OCUs are $0.24/hr; a minimal prod deployment runs
+# 2 indexing + 2 search OCUs (4 total). Storage $0.024/GB-month.
+
+[[dimensions]]
+id       = "ocu_hours"
+label    = "OpenSearch Compute Units"
+unit     = "OCU-hours"
+quantity = "default(ocu_count, 4) * monthly_hours()"
+rate     = "0.24"
+
+[[dimensions]]
+id       = "storage"
+label    = "Managed storage"
+unit     = "GB-month"
+quantity = "default(monthly_storage_gb, 0)"
+rate     = "0.024"
+when     = "default(monthly_storage_gb, 0) > 0"
+
+[fixture]
+attributes = { ocu_count = 4 }
+expected_monthly_cost = 700.8
+exact = true
+last_verified = "2026-06-10"

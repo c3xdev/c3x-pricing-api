@@ -1,0 +1,29 @@
+kind         = "aws_spot_instance_request"
+display_name = "AWS Spot Instance Request"
+provider     = "aws"
+
+# Spot prices float; we quote the on-demand rate as the ceiling
+# (spot is at most this, typically 60-90% less).
+
+[mappings.compute]
+service        = "AmazonEC2"
+product_family = "Compute Instance"
+attribute_filters = [
+  { key = "instanceType",    expr  = 'default(instance_type, "t3.micro")' },
+  { key = "operatingSystem", const = "Linux" },
+  { key = "preInstalledSw",  const = "NA" },
+  { key = "tenancy",         const = "Shared" },
+  { key = "capacitystatus",  const = "Used" },
+]
+
+[[dimensions]]
+id       = "compute_hours"
+label    = "Spot instance (on-demand ceiling)"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("compute")'
+
+[fixture]
+attributes = { instance_type = "t3.micro" }
+expected_monthly_cost = 7.59
+tolerance = 0.05

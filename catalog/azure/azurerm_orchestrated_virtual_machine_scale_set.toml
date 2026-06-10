@@ -1,0 +1,22 @@
+kind         = "azurerm_orchestrated_virtual_machine_scale_set"
+display_name = "Azure Orchestrated VM Scale Set"
+provider     = "azure"
+
+[mappings.compute]
+service        = "Virtual Machines"
+product_family = "Compute"
+attribute_filters = [
+  { key = "skuName", expr = 'default(sku_name, "Standard_D2s_v5")' },
+]
+
+[[dimensions]]
+id       = "instances"
+label    = "Scale set instances"
+unit     = "instance-hours"
+quantity = "default(instances, 1) * monthly_hours()"
+rate     = 'price("compute")'
+
+[fixture]
+attributes = { sku_name = "Standard_D2s_v5", instances = 2 }
+expected_monthly_cost = 274.48
+tolerance = 0.05

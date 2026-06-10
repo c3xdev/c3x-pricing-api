@@ -1,0 +1,35 @@
+kind         = "azurerm_windows_virtual_machine_scale_set"
+display_name = "Azure Windows VM Scale Set"
+provider     = "azure"
+
+# Instances × per-hour VM rate. NOTE: until the os-attribute scrape
+# lands, the skuName-only filter can surface the Windows rate for
+# Linux sets (documented picker limitation, fixed by the next
+# Azure scrape + os filter).
+
+[mappings.compute]
+service        = "Virtual Machines"
+product_family = "Compute"
+attribute_filters = [
+  { key = "skuName", expr = 'default(sku, "Standard_D2s_v5")' },
+]
+
+[[dimensions]]
+id       = "instances"
+label    = "Scale set instances"
+unit     = "instance-hours"
+quantity = "default(instances, 1) * monthly_hours()"
+rate     = 'price("compute")'
+
+[[dimensions]]
+id       = "os_disks"
+label    = "OS disks (managed)"
+unit     = "disk-months"
+when     = "default(os_disk_disk_size_gb, 0) > 0"
+quantity = "default(instances, 1)"
+rate     = "9.60"
+
+[fixture]
+attributes = { sku = "Standard_D2s_v5", instances = 3 }
+expected_monthly_cost = 411.72
+tolerance = 0.05

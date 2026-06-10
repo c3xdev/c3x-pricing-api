@@ -1,0 +1,18 @@
+kind         = "aws_kendra_index"
+display_name = "AWS Kendra Index"
+provider     = "aws"
+
+# STATIC: Developer edition $810/mo, Enterprise $1008/mo.
+
+[[dimensions]]
+id       = "index"
+label    = "Kendra index"
+unit     = "months"
+quantity = "1"
+rate     = 'default(edition, "DEVELOPER_EDITION") == "ENTERPRISE_EDITION" ? 1008.0 : 810.0'
+
+[fixture]
+attributes = { edition = "DEVELOPER_EDITION" }
+expected_monthly_cost = 810
+exact = true
+last_verified = "2026-06-10"

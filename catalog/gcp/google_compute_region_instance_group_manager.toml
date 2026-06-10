@@ -1,18 +1,27 @@
 kind         = "google_compute_region_instance_group_manager"
-display_name = "GCP Compute Region Instance Group Manager"
+display_name = "GCP Managed Instance Group"
 provider     = "gcp"
 
-# FREE: no per-resource GCP charge (parent or data plane bills).
+# MIGs bill via the instances they run: target_size × the instance
+# template's machine type. The template reference isn't resolvable
+# cross-resource yet — supply machine_type via usage/what-if, or
+# the e2-medium default applies.
+
+[mappings.node]
+service        = "Compute Engine"
+product_family = "Compute Instance"
+attribute_filters = [
+  { key = "machineType", expr = 'default(machine_type, "e2-medium")' },
+]
 
 [[dimensions]]
-id       = "free"
-label    = "Free resource"
-unit     = "n/a"
-quantity = "0"
-rate     = "0"
+id       = "instances"
+label    = "Managed instances"
+unit     = "instance-hours"
+quantity = "default(target_size, 1) * monthly_hours()"
+rate     = 'price("node")'
 
 [fixture]
-attributes = {}
-expected_monthly_cost = 0
-exact = true
-
+attributes = { machine_type = "e2-medium", target_size = 3 }
+expected_monthly_cost = 73.37
+tolerance = 0.05
