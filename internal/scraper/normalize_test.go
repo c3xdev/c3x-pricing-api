@@ -99,3 +99,19 @@ func TestNormaliseSkipsUnknownService(t *testing.T) {
 		t.Errorf("unrelated attr mutated: %q", attrs["instanceType"])
 	}
 }
+
+func TestAzureVMOSDiscriminator(t *testing.T) {
+	t.Parallel()
+	linux := azureAttributes("Virtual Machines", "Virtual Machines Dsv5 Series", "Standard_D2s_v5", "D2s v5", "", "Compute")
+	if linux["os"] != "Linux" {
+		t.Errorf("os = %q, want Linux", linux["os"])
+	}
+	win := azureAttributes("Virtual Machines", "Virtual Machines Dsv5 Series Windows", "Standard_D2s_v5", "D2s v5", "", "Compute")
+	if win["os"] != "Windows" {
+		t.Errorf("os = %q, want Windows", win["os"])
+	}
+	other := azureAttributes("Azure Cosmos DB", "Azure Cosmos DB", "RUs", "100 RU/s", "", "Databases")
+	if _, ok := other["os"]; ok {
+		t.Error("non-VM services must not carry an os attribute")
+	}
+}

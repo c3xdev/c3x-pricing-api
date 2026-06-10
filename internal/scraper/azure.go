@@ -185,14 +185,8 @@ func (s *AzureScraper) scrapeService(ctx context.Context, serviceName string) ([
 						Region:        region,
 						Service:       item.ServiceName,
 						ProductFamily: item.ServiceFamily,
-						Attributes: map[string]string{
-							"productName":   productName,
-							"skuName":       item.SkuName,
-							"meterName":     item.MeterName,
-							"armSkuName":    item.ArmSkuName,
-							"serviceFamily": item.ServiceFamily,
-						},
-						Prices: []db.Price{},
+						Attributes:    azureAttributes(item.ServiceName, productName, item.SkuName, item.MeterName, item.ArmSkuName, item.ServiceFamily),
+						Prices:        []db.Price{},
 					}
 				}
 
@@ -518,4 +512,30 @@ func (s *AzureScraper) fetchPage(ctx context.Context, pageURL string) (*azureRes
 		return nil, err
 	}
 	return result, nil
+}
+
+// azureAttributes builds the product attribute map, deriving
+// normalised discriminators the raw feed lacks.
+//
+// Virtual Machines: Linux and Windows rates share skuName/meterName
+// and differ only by a " Windows" productName suffix — without an
+// explicit `os` attribute, a consumer filtering on skuName alone
+// gets both rows and (worse) any max-price picker quotes the
+// Windows rate for a Linux VM.
+func azureAttributes(serviceName, productName, skuName, meterName, armSkuName, serviceFamily string) map[string]string {
+	attrs := map[string]string{
+		"productName":   productName,
+		"skuName":       skuName,
+		"meterName":     meterName,
+		"armSkuName":    armSkuName,
+		"serviceFamily": serviceFamily,
+	}
+	if serviceName == "Virtual Machines" {
+		if strings.HasSuffix(productName, " Windows") {
+			attrs["os"] = "Windows"
+		} else {
+			attrs["os"] = "Linux"
+		}
+	}
+	return attrs
 }
