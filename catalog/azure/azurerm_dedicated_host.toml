@@ -1,0 +1,19 @@
+kind         = "azurerm_dedicated_host"
+display_name = "Azure Dedicated Host"
+provider     = "azure"
+
+# STATIC: Dsv3-Type4 host ≈ $4.439/hr (host SKUs are family-keyed;
+# published 2026-06-10).
+
+[[dimensions]]
+id       = "host_hours"
+label    = "Dedicated host"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = "4.439"
+
+[fixture]
+attributes = { sku_name = "DSv3-Type4" }
+expected_monthly_cost = 3240.47
+exact = true
+last_verified = "2026-06-10"

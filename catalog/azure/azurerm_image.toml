@@ -1,0 +1,18 @@
+kind         = "azurerm_image"
+display_name = "Azure Managed VM Image"
+provider     = "azure"
+
+# STATIC: images bill as snapshot storage, $0.05/GB-month LRS.
+
+[[dimensions]]
+id       = "storage"
+label    = "Image storage"
+unit     = "GB-month"
+quantity = "default(storage_gb, 127)"
+rate     = "0.05"
+
+[fixture]
+attributes = { storage_gb = 127 }
+expected_monthly_cost = 6.35
+exact = true
+last_verified = "2026-06-10"

@@ -1,0 +1,19 @@
+kind         = "azurerm_app_configuration"
+display_name = "Azure App Configuration"
+provider     = "azure"
+
+# STATIC: Standard store is $1.20/day; Free tier $0.
+
+[[dimensions]]
+id       = "store_days"
+label    = "Standard store"
+unit     = "days"
+quantity = "30"
+rate     = 'default(sku, "free") == "standard" ? 1.20 : 0.0'
+when     = 'default(sku, "free") == "standard"'
+
+[fixture]
+attributes = { sku = "standard" }
+expected_monthly_cost = 36
+exact = true
+last_verified = "2026-06-10"

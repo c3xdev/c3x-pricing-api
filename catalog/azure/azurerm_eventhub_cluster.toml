@@ -1,0 +1,18 @@
+kind         = "azurerm_eventhub_cluster"
+display_name = "Azure Event Hubs Dedicated Cluster"
+provider     = "azure"
+
+# STATIC: dedicated capacity unit is $9.38/hr (legacy clusters).
+
+[[dimensions]]
+id       = "capacity_units"
+label    = "Dedicated capacity units"
+unit     = "CU-hours"
+quantity = "default(sku_capacity, 1) * monthly_hours()"
+rate     = "9.38"
+
+[fixture]
+attributes = { sku_capacity = 1 }
+expected_monthly_cost = 6847.4
+exact = true
+last_verified = "2026-06-10"

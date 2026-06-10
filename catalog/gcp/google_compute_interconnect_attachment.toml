@@ -1,0 +1,21 @@
+kind         = "google_compute_interconnect_attachment"
+display_name = "GCP Interconnect VLAN Attachment"
+provider     = "gcp"
+
+# STATIC: Partner Interconnect 1 Gbps attachment ≈ $0.10282/hr
+# ($75/mo); 10 Gbps $0.7534/hr. Dedicated bills the port instead.
+
+[[dimensions]]
+id       = "attachment"
+label    = "VLAN attachment"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = '''
+  default(bandwidth, "BPS_1G") == "BPS_10G" ? 0.7534 : 0.10282
+'''
+
+[fixture]
+attributes = { bandwidth = "BPS_1G" }
+expected_monthly_cost = 75.06
+exact = true
+last_verified = "2026-06-10"

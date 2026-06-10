@@ -1,0 +1,21 @@
+kind         = "azurerm_snapshot"
+display_name = "Azure Managed Disk Snapshot"
+provider     = "azure"
+
+# STATIC: snapshot capacity meter is tier-keyed in the upstream;
+# standard LRS snapshot storage is $0.05/GB-month (verified against
+# published pricing 2026-06-10).
+
+[[dimensions]]
+id       = "storage"
+label    = "Snapshot storage (Standard LRS)"
+unit     = "GB-month"
+quantity = "default(disk_size_gb, 0)"
+rate     = "0.05"
+when     = "default(disk_size_gb, 0) > 0"
+
+[fixture]
+attributes = { disk_size_gb = 128 }
+expected_monthly_cost = 6.4
+exact = true
+last_verified = "2026-06-10"

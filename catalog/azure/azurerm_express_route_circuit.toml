@@ -1,0 +1,23 @@
+kind         = "azurerm_express_route_circuit"
+display_name = "Azure ExpressRoute Circuit"
+provider     = "azure"
+
+# STATIC until the ExpressRoute scrape lands: metered 1 Gbps
+# Standard port is $436/mo; 500 Mbps $290; 10 Gbps $5700.
+
+[[dimensions]]
+id       = "port_fee"
+label    = "Circuit port fee (metered)"
+unit     = "months"
+quantity = "1"
+rate     = '''
+  default(bandwidth_in_mbps, 1000) >= 10000 ? 5700.0 :
+  default(bandwidth_in_mbps, 1000) >= 1000  ?  436.0 :
+                                               290.0
+'''
+
+[fixture]
+attributes = { bandwidth_in_mbps = 1000 }
+expected_monthly_cost = 436
+exact = true
+last_verified = "2026-06-10"

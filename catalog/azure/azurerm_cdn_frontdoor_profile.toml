@@ -1,0 +1,36 @@
+kind         = "azurerm_cdn_frontdoor_profile"
+display_name = "Azure Front Door (Standard/Premium) Profile"
+provider     = "azure"
+
+# Base fee is inline (Standard $35/mo, Premium $330/mo — published,
+# not exposed as a clean meter); requests price live.
+
+[mappings.requests]
+service        = "Azure Front Door Service"
+product_family = "Networking"
+region         = "Global"
+attribute_filters = [
+  { key = "skuName",   expr = 'default(sku_name, "Standard_AzureFrontDoor") startsWith "Premium" ? "Premium" : "Standard"' },
+  { key = "meterName", expr = 'default(sku_name, "Standard_AzureFrontDoor") startsWith "Premium" ? "Premium Requests" : "Standard Requests"' },
+]
+
+[[dimensions]]
+id       = "base_fee"
+label    = "Profile base fee"
+unit     = "months"
+quantity = "1"
+rate     = 'default(sku_name, "Standard_AzureFrontDoor") startsWith "Premium" ? 330.0 : 35.0'
+
+[[dimensions]]
+id       = "requests"
+label    = "Requests"
+unit     = "1M requests"
+quantity = "default(monthly_requests, 0) / 1000000"
+rate     = 'price("requests")'
+when     = "default(monthly_requests, 0) > 0"
+
+[fixture]
+attributes = { sku_name = "Standard_AzureFrontDoor", monthly_requests = 10_000_000 }
+expected_monthly_cost = 41
+tolerance = 0.05
+last_verified = "2026-06-10"

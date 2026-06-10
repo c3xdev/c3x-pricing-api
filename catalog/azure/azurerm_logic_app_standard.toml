@@ -1,0 +1,18 @@
+kind         = "azurerm_logic_app_standard"
+display_name = "Azure Logic App (Standard)"
+provider     = "azure"
+
+# STATIC: WS1 plan is $0.196/hr (1 vCPU / 3.5 GB).
+
+[[dimensions]]
+id       = "plan_hours"
+label    = "Workflow Standard plan (WS1-class)"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = "0.196"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 143.08
+exact = true
+last_verified = "2026-06-10"

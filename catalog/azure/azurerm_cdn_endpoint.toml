@@ -1,0 +1,26 @@
+kind         = "azurerm_cdn_endpoint"
+display_name = "Azure CDN Endpoint"
+provider     = "azure"
+
+[mappings.transfer]
+service        = "Content Delivery Network"
+product_family = "Networking"
+region         = "Zone 1"
+attribute_filters = [
+  { key = "productName", const = "Azure CDN from Microsoft" },
+  { key = "skuName",     const = "Standard" },
+  { key = "meterName",   const = "Standard Data Transfer" },
+]
+
+[[dimensions]]
+id       = "data_transfer"
+label    = "Outbound data transfer (Zone 1)"
+unit     = "GB"
+quantity = "default(monthly_data_transfer_gb, 0)"
+rate     = 'price("transfer")'
+when     = "default(monthly_data_transfer_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_data_transfer_gb = 1000 }
+expected_monthly_cost = 81
+tolerance = 0.05

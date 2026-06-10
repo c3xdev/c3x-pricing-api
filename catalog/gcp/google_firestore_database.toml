@@ -1,0 +1,37 @@
+kind         = "google_firestore_database"
+display_name = "GCP Firestore Database"
+provider     = "gcp"
+
+# Usage-driven: reads $0.06/100k, writes $0.18/100k, deletes
+# $0.02/100k, storage $0.18/GiB-month (Native mode, us-central1;
+# published 2026-06-10). STATIC pending a Firestore scrape.
+
+[[dimensions]]
+id       = "reads"
+label    = "Document reads"
+unit     = "100k reads"
+quantity = "default(monthly_reads, 0) / 100000"
+rate     = "0.06"
+when     = "default(monthly_reads, 0) > 0"
+
+[[dimensions]]
+id       = "writes"
+label    = "Document writes"
+unit     = "100k writes"
+quantity = "default(monthly_writes, 0) / 100000"
+rate     = "0.18"
+when     = "default(monthly_writes, 0) > 0"
+
+[[dimensions]]
+id       = "storage"
+label    = "Stored data"
+unit     = "GiB-month"
+quantity = "default(storage_gb, 0)"
+rate     = "0.18"
+when     = "default(storage_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_reads = 10_000_000, monthly_writes = 2_000_000, storage_gb = 50 }
+expected_monthly_cost = 18.6
+exact = true
+last_verified = "2026-06-10"

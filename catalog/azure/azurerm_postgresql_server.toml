@@ -1,0 +1,27 @@
+kind         = "azurerm_postgresql_server"
+display_name = "Azure PostgreSQL Single Server (legacy)"
+provider     = "azure"
+
+# STATIC: legacy Single Server GP Gen5 is $0.0438/vCore-hr +
+# $0.115/GB-month storage. (Retired tier; flexible server is the
+# live-priced replacement.)
+
+[[dimensions]]
+id       = "compute"
+label    = "vCores (GP Gen5)"
+unit     = "vCore-hours"
+quantity = "default(vcores, 2) * monthly_hours()"
+rate     = "0.0438"
+
+[[dimensions]]
+id       = "storage"
+label    = "Storage"
+unit     = "GB-month"
+quantity = "default(storage_mb, 51200) / 1024"
+rate     = "0.115"
+
+[fixture]
+attributes = { vcores = 2, storage_mb = 51200 }
+expected_monthly_cost = 69.7
+exact = true
+last_verified = "2026-06-10"

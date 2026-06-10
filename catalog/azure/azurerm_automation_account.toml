@@ -1,0 +1,23 @@
+kind         = "azurerm_automation_account"
+display_name = "Azure Automation Account"
+provider     = "azure"
+
+# Process automation bills $0.002/minute beyond the free 500
+# min/month. Watchers $0.002/hr. Usage-driven.
+
+[[dimensions]]
+id       = "job_minutes"
+label    = "Job run minutes (beyond free 500)"
+unit     = "minutes"
+quantity = '''
+  default(monthly_job_run_minutes, 0) > 500 ?
+    default(monthly_job_run_minutes, 0) - 500 : 0
+'''
+rate     = "0.002"
+when     = "default(monthly_job_run_minutes, 0) > 500"
+
+[fixture]
+attributes = { monthly_job_run_minutes = 10_500 }
+expected_monthly_cost = 20
+exact = true
+last_verified = "2026-06-10"

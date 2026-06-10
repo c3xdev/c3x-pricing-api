@@ -1,0 +1,19 @@
+kind         = "azurerm_point_to_site_vpn_gateway"
+display_name = "Azure vWAN P2S VPN Gateway"
+provider     = "azure"
+
+# STATIC: vWAN point-to-site scale unit is $0.361/hr plus
+# $0.013/hr per connection unit (connections via usage attr).
+
+[[dimensions]]
+id       = "scale_units"
+label    = "P2S scale units"
+unit     = "unit-hours"
+quantity = "default(scale_unit, 1) * monthly_hours()"
+rate     = "0.361"
+
+[fixture]
+attributes = { scale_unit = 1 }
+expected_monthly_cost = 263.53
+exact = true
+last_verified = "2026-06-10"

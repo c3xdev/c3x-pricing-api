@@ -1,0 +1,18 @@
+kind         = "azurerm_relay_namespace"
+display_name = "Azure Relay Namespace"
+provider     = "azure"
+
+# STATIC: hybrid connection listener is $9.78/mo per connection.
+
+[[dimensions]]
+id       = "listeners"
+label    = "Hybrid connection listeners"
+unit     = "listener-months"
+quantity = "default(hybrid_connection_count, 1)"
+rate     = "9.78"
+
+[fixture]
+attributes = { hybrid_connection_count = 1 }
+expected_monthly_cost = 9.78
+exact = true
+last_verified = "2026-06-10"

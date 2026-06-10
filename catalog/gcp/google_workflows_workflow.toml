@@ -1,0 +1,20 @@
+kind         = "google_workflows_workflow"
+display_name = "GCP Workflows Workflow"
+provider     = "gcp"
+
+# Usage-driven: $0.01 per 1k internal steps beyond the free 5k/mo;
+# external HTTP steps $0.025/1k.
+
+[[dimensions]]
+id       = "steps"
+label    = "Internal steps"
+unit     = "1k steps"
+quantity = "default(monthly_steps, 0) / 1000"
+rate     = "0.01"
+when     = "default(monthly_steps, 0) > 0"
+
+[fixture]
+attributes = { monthly_steps = 1_000_000 }
+expected_monthly_cost = 10
+exact = true
+last_verified = "2026-06-10"

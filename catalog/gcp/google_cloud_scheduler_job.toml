@@ -1,0 +1,19 @@
+kind         = "google_cloud_scheduler_job"
+display_name = "GCP Cloud Scheduler Job"
+provider     = "gcp"
+
+# STATIC: $0.10/job/month beyond the 3 free jobs (per project; the
+# free-tier allocation is modelled per-job pessimistically off).
+
+[[dimensions]]
+id       = "job"
+label    = "Scheduled job"
+unit     = "job-months"
+quantity = "1"
+rate     = "0.10"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 0.1
+exact = true
+last_verified = "2026-06-10"

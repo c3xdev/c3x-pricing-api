@@ -1,0 +1,18 @@
+kind         = "azurerm_stream_analytics_job"
+display_name = "Azure Stream Analytics Job"
+provider     = "azure"
+
+# STATIC until the Stream Analytics scrape lands: $0.11/SU-hr (V1).
+
+[[dimensions]]
+id       = "streaming_units"
+label    = "Streaming units"
+unit     = "SU-hours"
+quantity = "default(streaming_units, 1) * monthly_hours()"
+rate     = "0.11"
+
+[fixture]
+attributes = { streaming_units = 3 }
+expected_monthly_cost = 240.9
+exact = true
+last_verified = "2026-06-10"

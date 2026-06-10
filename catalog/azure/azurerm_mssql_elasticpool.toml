@@ -1,0 +1,26 @@
+kind         = "azurerm_mssql_elasticpool"
+display_name = "Azure SQL Elastic Pool"
+provider     = "azure"
+
+# STATIC: GP Gen5 vCore pools are $0.1129/vCore-hr (zone-redundant
+# and DTU pools differ; published 2026-06-10).
+
+[[dimensions]]
+id       = "vcores"
+label    = "Pool vCores (GP Gen5)"
+unit     = "vCore-hours"
+quantity = "default(sku_capacity, 2) * monthly_hours()"
+rate     = "0.1129"
+
+[[dimensions]]
+id       = "storage"
+label    = "Pool storage"
+unit     = "GB-month"
+quantity = "default(max_size_gb, 32)"
+rate     = "0.115"
+
+[fixture]
+attributes = { sku_capacity = 4, max_size_gb = 100 }
+expected_monthly_cost = 341.17
+exact = true
+last_verified = "2026-06-10"

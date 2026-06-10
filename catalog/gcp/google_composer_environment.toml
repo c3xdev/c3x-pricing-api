@@ -1,0 +1,19 @@
+kind         = "google_composer_environment"
+display_name = "GCP Cloud Composer Environment"
+provider     = "gcp"
+
+# STATIC: Composer 2 small environment ≈ $0.494/hr in compute+
+# storage fees (2 vCPU scheduler+web, small workers).
+
+[[dimensions]]
+id       = "environment"
+label    = "Environment (small, Composer 2)"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = "0.494"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 360.62
+exact = true
+last_verified = "2026-06-10"

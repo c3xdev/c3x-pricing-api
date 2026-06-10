@@ -1,0 +1,22 @@
+kind         = "azurerm_kubernetes_cluster_node_pool"
+display_name = "AKS Additional Node Pool"
+provider     = "azure"
+
+[mappings.node]
+service        = "Virtual Machines"
+product_family = "Compute"
+attribute_filters = [
+  { key = "skuName", expr = 'default(vm_size, "Standard_D2s_v5")' },
+]
+
+[[dimensions]]
+id       = "nodes"
+label    = "Node pool instances"
+unit     = "instance-hours"
+quantity = "default(node_count, 1) * monthly_hours()"
+rate     = 'price("node")'
+
+[fixture]
+attributes = { node_count = 2, vm_size = "Standard_D2s_v5" }
+expected_monthly_cost = 274.48
+tolerance = 0.05

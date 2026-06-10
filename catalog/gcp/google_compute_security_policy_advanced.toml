@@ -1,0 +1,29 @@
+kind         = "google_compute_security_policy_advanced"
+display_name = "GCP Cloud Armor Policy (Standard tier)"
+provider     = "gcp"
+
+# STATIC: Cloud Armor Standard bills $5/policy/month +
+# $1/rule/month + $0.75/M requests. The plain
+# google_compute_security_policy kind stays free-listed because
+# most policies ride the included tier; use this kind's attributes
+# via usage when Standard-tier billing applies.
+
+[[dimensions]]
+id       = "policy"
+label    = "Security policy"
+unit     = "months"
+quantity = "1"
+rate     = "5.0"
+
+[[dimensions]]
+id       = "rules"
+label    = "Rules"
+unit     = "rule-months"
+quantity = "default(rule_count, 1)"
+rate     = "1.0"
+
+[fixture]
+attributes = { rule_count = 5 }
+expected_monthly_cost = 10
+exact = true
+last_verified = "2026-06-10"

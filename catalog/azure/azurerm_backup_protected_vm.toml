@@ -1,0 +1,31 @@
+kind         = "azurerm_backup_protected_vm"
+display_name = "Azure Backup Protected VM"
+provider     = "azure"
+
+# Protected-instance fee: $10/mo for VMs ≤500 GB (+$10 per extra
+# 500 GB increment) plus backup storage (usage attribute).
+
+[[dimensions]]
+id       = "instance_fee"
+label    = "Protected instance fee"
+unit     = "months"
+quantity = "1"
+rate     = '''
+  default(vm_size_gb, 500) <= 50  ? 5.0 :
+  default(vm_size_gb, 500) <= 500 ? 10.0 :
+    10.0 * ((default(vm_size_gb, 500) + 499) / 500)
+'''
+
+[[dimensions]]
+id       = "backup_storage"
+label    = "Backup storage (LRS)"
+unit     = "GB-month"
+quantity = "default(monthly_backup_storage_gb, 0)"
+rate     = "0.0224"
+when     = "default(monthly_backup_storage_gb, 0) > 0"
+
+[fixture]
+attributes = { vm_size_gb = 500, monthly_backup_storage_gb = 100 }
+expected_monthly_cost = 12.24
+exact = true
+last_verified = "2026-06-10"

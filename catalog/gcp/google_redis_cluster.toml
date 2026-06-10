@@ -1,0 +1,22 @@
+kind         = "google_redis_cluster"
+display_name = "GCP Memorystore Redis Cluster"
+provider     = "gcp"
+
+[mappings.node]
+service        = "Cloud Memorystore for Redis"
+product_family = "ApplicationServices"
+attribute_filters = [
+  { key = "description", const = "Redis Cluster Node Highmem XLarge Iowa" },
+]
+
+[[dimensions]]
+id       = "nodes"
+label    = "Cluster nodes (highmem XL)"
+unit     = "node-hours"
+quantity = "default(shard_count, 3) * monthly_hours()"
+rate     = 'price("node")'
+
+[fixture]
+attributes = { shard_count = 3 }
+expected_monthly_cost = 1879.24
+tolerance = 0.05

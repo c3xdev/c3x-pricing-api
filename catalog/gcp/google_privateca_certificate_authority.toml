@@ -1,0 +1,19 @@
+kind         = "google_privateca_certificate_authority"
+display_name = "GCP Certificate Authority Service CA"
+provider     = "gcp"
+
+# STATIC: DevOps-tier CA $20/mo, Enterprise-tier CA $200/mo;
+# certificates bill per issuance (usage attribute).
+
+[[dimensions]]
+id       = "ca_fee"
+label    = "Certificate authority"
+unit     = "months"
+quantity = "1"
+rate     = 'default(tier, "DEVOPS") == "ENTERPRISE" ? 200.0 : 20.0'
+
+[fixture]
+attributes = { tier = "DEVOPS" }
+expected_monthly_cost = 20
+exact = true
+last_verified = "2026-06-10"

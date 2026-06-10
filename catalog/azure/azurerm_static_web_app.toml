@@ -1,0 +1,19 @@
+kind         = "azurerm_static_web_app"
+display_name = "Azure Static Web App"
+provider     = "azure"
+
+# STATIC: Standard plan is $9/app/month; Free tier $0.
+
+[[dimensions]]
+id       = "plan"
+label    = "Standard plan"
+unit     = "months"
+quantity = "1"
+rate     = "9.0"
+when     = 'default(sku_tier, "Free") == "Standard"'
+
+[fixture]
+attributes = { sku_tier = "Standard" }
+expected_monthly_cost = 9
+exact = true
+last_verified = "2026-06-10"

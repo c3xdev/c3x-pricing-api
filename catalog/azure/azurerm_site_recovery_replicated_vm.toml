@@ -1,0 +1,18 @@
+kind         = "azurerm_site_recovery_replicated_vm"
+display_name = "Azure Site Recovery Replicated VM"
+provider     = "azure"
+
+# STATIC: $25/mo per protected instance (Azure-to-Azure).
+
+[[dimensions]]
+id       = "protected_instance"
+label    = "Protected instance"
+unit     = "months"
+quantity = "1"
+rate     = "25.0"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 25
+exact = true
+last_verified = "2026-06-10"

@@ -1,0 +1,19 @@
+kind         = "google_compute_ha_vpn_gateway"
+display_name = "GCP HA VPN Gateway"
+provider     = "gcp"
+
+# STATIC: HA VPN bills per tunnel-hour ($0.05); a typical HA pair
+# runs two tunnels.
+
+[[dimensions]]
+id       = "tunnels"
+label    = "VPN tunnels (HA pair)"
+unit     = "tunnel-hours"
+quantity = "default(tunnel_count, 2) * monthly_hours()"
+rate     = "0.05"
+
+[fixture]
+attributes = { tunnel_count = 2 }
+expected_monthly_cost = 73
+exact = true
+last_verified = "2026-06-10"

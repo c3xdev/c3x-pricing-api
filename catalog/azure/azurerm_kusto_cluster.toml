@@ -1,0 +1,27 @@
+kind         = "azurerm_kusto_cluster"
+display_name = "Azure Data Explorer Cluster"
+provider     = "azure"
+
+# STATIC until the Data Explorer scrape lands: ADX markup is
+# $0.11/vCPU-hr on top of the VM cost; D11_v2 (2 vCPU) dev/test
+# example. Total = markup + underlying compute.
+
+[[dimensions]]
+id       = "markup"
+label    = "ADX markup"
+unit     = "vCPU-hours"
+quantity = "default(vcpu_count, 2) * default(instance_count, 2) * monthly_hours()"
+rate     = "0.11"
+
+[[dimensions]]
+id       = "compute"
+label    = "Underlying instances (D11_v2-class)"
+unit     = "instance-hours"
+quantity = "default(instance_count, 2) * monthly_hours()"
+rate     = "0.226"
+
+[fixture]
+attributes = { instance_count = 2, vcpu_count = 2 }
+expected_monthly_cost = 651.16
+exact = true
+last_verified = "2026-06-10"

@@ -1,0 +1,25 @@
+kind         = "azurerm_powerbi_embedded"
+display_name = "Power BI Embedded Capacity"
+provider     = "azure"
+
+# STATIC: A1 $1.0081/hr; each tier doubles.
+
+[[dimensions]]
+id       = "capacity_hours"
+label    = "Embedded capacity"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = '''
+  default(sku_name, "A1") == "A2" ? 2.0161 :
+  default(sku_name, "A1") == "A3" ? 4.0323 :
+  default(sku_name, "A1") == "A4" ? 8.0645 :
+  default(sku_name, "A1") == "A5" ? 16.129 :
+  default(sku_name, "A1") == "A6" ? 32.258 :
+                                    1.0081
+'''
+
+[fixture]
+attributes = { sku_name = "A1" }
+expected_monthly_cost = 735.91
+exact = true
+last_verified = "2026-06-10"

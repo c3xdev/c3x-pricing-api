@@ -1,0 +1,24 @@
+kind         = "azurerm_ddos_protection_plan"
+display_name = "Azure DDoS Network Protection Plan"
+provider     = "azure"
+
+[mappings.plan]
+service        = "Azure DDOS Protection"
+product_family = "Networking"
+region         = "Global"
+attribute_filters = [
+  { key = "skuName",   const = "Network Protection" },
+  { key = "meterName", const = "Network Protection Plan" },
+]
+
+[[dimensions]]
+id       = "plan_hours"
+label    = "DDoS network protection plan (covers 100 IPs)"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("plan")'
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 2943.55
+tolerance = 0.05
