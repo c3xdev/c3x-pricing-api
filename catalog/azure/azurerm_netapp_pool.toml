@@ -2,22 +2,23 @@ kind         = "azurerm_netapp_pool"
 display_name = "Azure NetApp Files Capacity Pool"
 provider     = "azure"
 
-# STATIC until the NetApp scrape lands: Premium tier
-# $0.000403/GiB-hr ≈ $0.294/GiB-month; Standard $0.000202.
+[mappings.capacity]
+service        = "Azure NetApp Files"
+product_family = "Storage"
+attribute_filters = [
+  { key = "skuName",   expr = 'default(service_level, "Premium")' },
+  { key = "meterName", expr = 'default(service_level, "Premium") + " Capacity"' },
+]
 
 [[dimensions]]
 id       = "pool_capacity"
 label    = "Capacity pool"
-unit     = "GiB-months"
-quantity = "default(size_in_tb, 4) * 1024"
-rate     = '''
-  default(service_level, "Premium") == "Standard" ? 0.1475 :
-  default(service_level, "Premium") == "Ultra"    ? 0.3933 :
-                                                    0.2941
-'''
+unit     = "GiB-hours"
+quantity = "default(size_in_tb, 4) * 1024 * monthly_hours()"
+rate     = 'price("capacity")'
 
 [fixture]
+# 4 TiB Premium × $0.000403/GiB-hr × 730h
 attributes = { size_in_tb = 4, service_level = "Premium" }
-expected_monthly_cost = 1204.63
-exact = true
-last_verified = "2026-06-10"
+expected_monthly_cost = 1204.96
+tolerance = 0.05
