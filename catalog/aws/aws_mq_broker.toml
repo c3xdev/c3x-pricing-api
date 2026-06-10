@@ -1,0 +1,60 @@
+kind         = "aws_mq_broker"
+display_name = "AWS MQ Broker"
+provider     = "aws"
+
+# Amazon MQ bills per broker-instance-hour (varies by engine,
+# deployment mode, and instance type) and per-GB-month of storage.
+# Engine families:
+#   - ActiveMQ (default)
+#   - RabbitMQ
+# Deployment modes:
+#   - SINGLE_INSTANCE (1 broker)
+#   - ACTIVE_STANDBY_MULTI_AZ (ActiveMQ, 2 brokers)
+#   - CLUSTER_MULTI_AZ (RabbitMQ, 3 brokers)
+
+[mappings.broker]
+service        = "AmazonMQ"
+product_family = "Broker Instances"
+attribute_filters = [
+  { key = "brokerEngine", expr = '''
+      pick(default(engine_type, "ActiveMQ") == "RabbitMQ", "RabbitMQ", "ActiveMQ")
+  ''' },
+  # host_instance_type comes from Terraform as "mq.t3.micro"; the
+  # upstream catalog stores `instanceType` as the bare "t3.micro".
+  { key = "instanceType", expr = '''
+      replace(default(host_instance_type, "mq.t3.micro"), "mq.", "")
+  ''' },
+  { key = "deploymentOption", expr = '''
+      pick(default(deployment_mode, "SINGLE_INSTANCE") == "SINGLE_INSTANCE", "Single-AZ", "Multi-AZ")
+  ''' },
+]
+
+[mappings.storage]
+service        = "AmazonMQ"
+product_family = "Broker Storage"
+attribute_filters = [
+  { key = "storageMedia", const = "EBS" },
+]
+
+[[dimensions]]
+id       = "broker_hours"
+label    = "Broker instance"
+unit     = "hours"
+quantity = '''
+  pick(default(deployment_mode, "SINGLE_INSTANCE") == "SINGLE_INSTANCE", 1,
+  pick(default(deployment_mode, "SINGLE_INSTANCE") == "CLUSTER_MULTI_AZ", 3, 2)) * monthly_hours()
+'''
+rate     = 'price("broker")'
+
+[[dimensions]]
+id       = "storage"
+label    = "Broker storage"
+unit     = "GB-month"
+quantity = "default(storage_size_gb, 20)"
+rate     = 'price("storage")'
+
+[fixture]
+attributes = { deployment_mode = "SINGLE_INSTANCE", engine_type = "ActiveMQ", host_instance_type = "mq.t3.micro", storage_size_gb = 20 }
+expected_monthly_cost = 19.74
+tolerance = 0.05
+

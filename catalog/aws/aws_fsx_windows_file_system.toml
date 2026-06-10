@@ -1,0 +1,30 @@
+kind         = "aws_fsx_windows_file_system"
+display_name = "AWS FSx for Windows"
+provider     = "aws"
+
+# FSx for Windows bills per-GB-month of provisioned SSD or HDD
+# storage. Multi-AZ is ~2x the single-AZ rate.
+
+[mappings.storage]
+service        = "AmazonFSx"
+product_family = "Storage"
+attribute_filters = [
+  { key = "fileSystemType",   const = "Windows" },
+  { key = "storageType",      expr = 'default(storage_type, "SSD")' },
+  { key = "deploymentOption", expr = '''
+      default(deployment_type, "SINGLE_AZ_1") == "MULTI_AZ_1" ? "Multi-AZ" : "Single-AZ"
+  ''' },
+]
+
+[[dimensions]]
+id       = "storage"
+label    = "Provisioned storage"
+unit     = "GB-month"
+quantity = "default(storage_capacity, 32)"
+rate     = 'price("storage")'
+
+[fixture]
+attributes = { deployment_type = "SINGLE_AZ_1", storage_capacity = 32, storage_type = "SSD" }
+expected_monthly_cost = 4.16
+tolerance = 0.05
+

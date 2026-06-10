@@ -1,0 +1,34 @@
+kind         = "aws_lightsail_database"
+display_name = "AWS Lightsail Database"
+provider     = "aws"
+
+# Lightsail Databases bill per-hour by bundle, with a `_ha` suffix
+# for high-availability variants.
+
+[mappings.bundle]
+service        = "AmazonLightsail"
+product_family = "Lightsail Database"
+attribute_filters = [
+  { key = "usagetype", expr = '''
+      "USE1-DatabaseUsage:" +
+      (default(bundle_id, "micro_2_0") == "micro_2_0"  ? "1GB" :
+       default(bundle_id, "micro_2_0") == "small_2_0"  ? "2GB" :
+       default(bundle_id, "micro_2_0") == "medium_2_0" ? "4GB" :
+       default(bundle_id, "micro_2_0") == "large_2_0"  ? "8GB" :
+                                                         "1GB") +
+      (default(bundle_id, "micro_2_0") in ["micro_2_0_ha","small_2_0_ha","medium_2_0_ha","large_2_0_ha"] ? "_ha" : "")
+  ''' },
+]
+
+[[dimensions]]
+id       = "database_hours"
+label    = "Lightsail database"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("bundle")'
+
+[fixture]
+attributes = { bundle_id = "micro_2_0" }
+expected_monthly_cost = 14.72
+tolerance = 0.05
+

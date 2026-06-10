@@ -1,0 +1,27 @@
+kind         = "aws_glue_crawler"
+display_name = "AWS Glue Crawler"
+provider     = "aws"
+
+# Glue crawlers bill per DPU-hour, $0.44/DPU-hour (us-east-1).
+# Crawlers always use 2 DPUs minimum; users may run more for
+# higher-throughput catalog discovery.
+
+[mappings.crawler]
+service        = "AWSGlue"
+product_family = "AWS Glue"
+attribute_filters = [
+  { key = "group", const = "Data catalog crawler run" },
+]
+
+[[dimensions]]
+id       = "dpu_hours"
+label    = "Crawler DPU"
+unit     = "DPU-hours"
+quantity = "default(monthly_dpu_hours, 0)"
+rate     = 'price("crawler")'
+when     = "default(monthly_dpu_hours, 0) > 0"
+
+[fixture]
+attributes = { monthly_dpu_hours = 10 }
+expected_monthly_cost = 4.4
+tolerance = 0.05

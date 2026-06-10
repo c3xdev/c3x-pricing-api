@@ -1,0 +1,39 @@
+kind         = "aws_sfn_state_machine"
+display_name = "AWS Step Functions State Machine"
+provider     = "aws"
+
+[mappings.standard_transitions]
+service        = "AmazonStates"
+product_family = "AWS Step Functions"
+attribute_filters = [
+  { key = "group", const = "SFN-StateTransitions" },
+]
+
+[mappings.express_duration]
+service        = "AmazonStates"
+product_family = "AWS Step Functions"
+attribute_filters = [
+  { key = "group", const = "SFN-ExpressWorkflows-Duration" },
+]
+
+[[dimensions]]
+id       = "standard_transitions"
+label    = "Standard state transitions"
+unit     = "transitions"
+when     = 'default(type, "STANDARD") == "STANDARD"'
+quantity = "default(monthly_state_transitions, 0)"
+rate     = 'price("standard_transitions")'
+
+[[dimensions]]
+id       = "express_duration"
+label    = "Express workflow duration"
+unit     = "GB-seconds"
+when     = 'default(type, "STANDARD") == "EXPRESS"'
+quantity = "default(monthly_express_gb_seconds, 0)"
+rate     = 'price("express_duration")'
+
+[fixture]
+attributes = { monthly_state_transitions = 100_000, type = "STANDARD" }
+expected_monthly_cost = 2.5
+tolerance = 0.05
+

@@ -1,0 +1,27 @@
+kind         = "azurerm_application_gateway"
+display_name = "Azure Application Gateway"
+provider     = "azure"
+
+# Default to Application Gateway WAF v2 ($0.36/hr fixed + per-CU). For
+# Standard_v2 (no WAF), use the meter "Standard Fixed Cost" if available.
+
+[mappings.waf_v2_fixed]
+service        = "Application Gateway"
+product_family = "Networking"
+attribute_filters = [
+  { key = "productName", const = "Application Gateway WAF v2" },
+  { key = "meterName",   const = "Standard Fixed Cost" },
+]
+
+[[dimensions]]
+id       = "gateway_hours"
+label    = "Application Gateway WAF v2"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("waf_v2_fixed")'
+
+[fixture]
+attributes = { monthly_capacity_units = 100, sku_name = "Standard_v2" }
+expected_monthly_cost = 262.8
+tolerance = 0.05
+

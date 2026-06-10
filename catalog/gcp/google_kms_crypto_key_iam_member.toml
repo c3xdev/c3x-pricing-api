@@ -1,0 +1,18 @@
+kind         = "google_kms_crypto_key_iam_member"
+display_name = "GCP Kms Crypto Key Iam Member"
+provider     = "gcp"
+
+# FREE: no per-resource GCP charge.
+
+[[dimensions]]
+id       = "free"
+label    = "Free resource"
+unit     = "n/a"
+quantity = "0"
+rate     = "0"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 0
+exact = true
+

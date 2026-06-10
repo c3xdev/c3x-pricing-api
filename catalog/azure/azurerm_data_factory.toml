@@ -1,0 +1,28 @@
+kind         = "azurerm_data_factory"
+display_name = "Azure Data Factory"
+provider     = "azure"
+
+# Cloud activity runs: $1.00 per 1,000. Data Movement DIU: $0.25/DIU-hour.
+# Use published rates since the upstream catalogue's Data Factory entries
+# are fragmented across meter names.
+
+[[dimensions]]
+id       = "activities"
+label    = "Pipeline activity runs"
+unit     = "1K runs"
+quantity = "default(monthly_activity_runs, 0) / 1000"
+rate     = "1.00"
+
+[[dimensions]]
+id       = "diu_hours"
+label    = "Data movement (DIU)"
+unit     = "DIU-hours"
+quantity = "default(monthly_diu_hours, 0)"
+rate     = "0.25"
+
+[fixture]
+attributes = { monthly_activity_runs = 10_000, monthly_diu_hours = 100 }
+expected_monthly_cost = 35
+exact = true
+last_verified = "2026-06-09"
+

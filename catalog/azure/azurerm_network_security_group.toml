@@ -1,0 +1,18 @@
+kind         = "azurerm_network_security_group"
+display_name = "Azure Network Security Group"
+provider     = "azure"
+
+# FREE: no per-resource Azure charge.
+
+[[dimensions]]
+id       = "free"
+label    = "Free resource"
+unit     = "n/a"
+quantity = "0"
+rate     = "0"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 0
+exact = true
+

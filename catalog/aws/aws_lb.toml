@@ -1,0 +1,70 @@
+kind         = "aws_lb"
+display_name = "AWS Elastic Load Balancer"
+provider     = "aws"
+
+[mappings.alb_hours]
+service        = "AWSELB"
+product_family = "Load Balancer-Application"
+attribute_filters = [
+  { key = "operation", const = "LoadBalancing:Application" },
+  { key = "usagetype", const = "LoadBalancerUsage" },
+]
+
+[mappings.nlb_hours]
+service        = "AWSELB"
+product_family = "Load Balancer-Network"
+attribute_filters = [
+  { key = "operation", const = "LoadBalancing:Network" },
+  { key = "usagetype", const = "LoadBalancerUsage" },
+]
+
+[mappings.gwlb_hours]
+service        = "AWSELB"
+product_family = "Load Balancer-Gateway"
+attribute_filters = [
+  { key = "operation", const = "LoadBalancing:Gateway" },
+]
+
+[mappings.alb_lcu]
+service        = "AWSELB"
+product_family = "Load Balancer-Application"
+attribute_filters = [
+  { key = "operation", const = "LoadBalancing:Application" },
+  { key = "usagetype", const = "LCUUsage" },
+]
+
+[mappings.nlb_lcu]
+service        = "AWSELB"
+product_family = "Load Balancer-Network"
+attribute_filters = [
+  { key = "operation", const = "LoadBalancing:Network" },
+  { key = "usagetype", const = "LCUUsage" },
+]
+
+[[dimensions]]
+id       = "lb_hours"
+label    = "Load balancer"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = '''
+  pick(default(load_balancer_type, "application") == "network", price("nlb_hours"),
+  pick(default(load_balancer_type, "application") == "gateway", price("gwlb_hours"),
+  price("alb_hours")))
+'''
+
+[[dimensions]]
+id       = "lcu_hours"
+label    = "Load balancer capacity units"
+unit     = "LCU-hours"
+quantity = "default(monthly_lcu_hours, 0)"
+rate     = '''
+  pick(default(load_balancer_type, "application") == "network", price("nlb_lcu"),
+  pick(default(load_balancer_type, "application") == "gateway", price("alb_lcu"),
+  price("alb_lcu")))
+'''
+
+[fixture]
+attributes = { load_balancer_type = "application", monthly_lcu_hours = 100 }
+expected_monthly_cost = 17.23
+tolerance = 0.05
+

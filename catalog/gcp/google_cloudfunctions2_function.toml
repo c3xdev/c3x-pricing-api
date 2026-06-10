@@ -1,0 +1,20 @@
+kind         = "google_cloudfunctions2_function"
+display_name = "GCP Cloud Functions (2nd gen)"
+provider     = "gcp"
+
+# Cloud Functions 2nd gen runs on Cloud Run pricing internally, but the
+# invocation fee is $0.40 per million invocations after the free tier.
+
+[[dimensions]]
+id       = "invocations"
+label    = "Function invocations"
+unit     = "1M invocations"
+quantity = "default(monthly_invocations, 0) / 1000000"
+rate     = "0.40"
+
+[fixture]
+attributes = { monthly_invocations = 1_000_000 }
+expected_monthly_cost = 0.4
+exact = true
+last_verified = "2026-06-09"
+

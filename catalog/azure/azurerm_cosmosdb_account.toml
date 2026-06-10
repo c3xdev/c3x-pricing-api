@@ -1,0 +1,46 @@
+kind         = "azurerm_cosmosdb_account"
+display_name = "Azure Cosmos DB Account"
+provider     = "azure"
+
+# Standard provisioned throughput: $0.008 per 100 RU/s per hour,
+# plus $0.25/GB-month of transactional storage.
+
+[mappings.throughput]
+service        = "Azure Cosmos DB"
+product_family = "Databases"
+attribute_filters = [
+  { key = "productName", const = "Azure Cosmos DB" },
+  { key = "skuName",     const = "RUs" },
+  { key = "meterName",   const = "100 RU/s" },
+]
+
+[mappings.storage]
+service        = "Azure Cosmos DB"
+product_family = "Databases"
+attribute_filters = [
+  { key = "productName", const = "Azure Cosmos DB" },
+  { key = "skuName",     const = "RUs" },
+  { key = "meterName",   const = "Data Stored" },
+]
+
+[[dimensions]]
+id       = "request_units"
+label    = "Provisioned throughput (Standard)"
+unit     = "100 RU/s-hours"
+quantity = "default(monthly_provisioned_ru_per_sec, 0) / 100 * monthly_hours()"
+rate     = 'price("throughput")'
+when     = "default(monthly_provisioned_ru_per_sec, 0) > 0"
+
+[[dimensions]]
+id       = "storage"
+label    = "Transactional storage"
+unit     = "GB-month"
+quantity = "default(monthly_storage_gb, 0)"
+rate     = 'price("storage")'
+when     = "default(monthly_storage_gb, 0) > 0"
+
+[fixture]
+# 1000 RU/s: 10 × 730 × $0.008 = $58.40
+attributes = { monthly_provisioned_ru_per_sec = 1000 }
+expected_monthly_cost = 58.4
+tolerance = 0.05

@@ -1,0 +1,26 @@
+kind         = "aws_sqs_queue"
+display_name = "AWS SQS Queue"
+provider     = "aws"
+
+[mappings.standard]
+service        = "AWSQueueService"
+product_family = "API Request"
+attribute_filters = [{ key = "queueType", const = "Standard" }]
+
+[mappings.fifo]
+service        = "AWSQueueService"
+product_family = "API Request"
+attribute_filters = [{ key = "queueType", const = "FIFO" }]
+
+[[dimensions]]
+id       = "requests"
+label    = "SQS API requests"
+unit     = "requests"
+quantity = "default(monthly_requests, 0)"
+rate     = 'pick(default(fifo_queue, false), price("fifo"), price("standard"))'
+
+[fixture]
+attributes = { fifo_queue = false, monthly_requests = 1_000_000 }
+expected_monthly_cost = 0.4
+tolerance = 0.05
+

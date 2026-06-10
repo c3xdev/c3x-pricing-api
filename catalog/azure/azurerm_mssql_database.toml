@@ -1,0 +1,36 @@
+kind         = "azurerm_mssql_database"
+display_name = "Azure SQL Database"
+provider     = "azure"
+
+# Azure SQL Database vCore pricing for General Purpose (Gen5).
+# Discriminate by skuName ("X vCore"). Storage bills separately at
+# ~$0.115/GB/month — modelled as a second dimension.
+
+[mappings.compute]
+service        = "SQL Database"
+product_family = "Databases"
+attribute_filters = [
+  { key = "productName", const = "SQL Database Single/Elastic Pool General Purpose - Compute Gen5" },
+  { key = "skuName",     expr = 'string(default(vcores, 2)) + " vCore"' },
+]
+
+[[dimensions]]
+id       = "compute_hours"
+label    = "SQL DB compute"
+unit     = "vCore-hours"
+quantity = "monthly_hours()"
+rate     = 'price("compute")'
+
+[[dimensions]]
+id       = "storage"
+label    = "Storage"
+unit     = "GB-month"
+quantity = "default(max_size_gb, 32)"
+rate     = "0.115"
+
+[fixture]
+attributes = { max_size_gb = 32, vcores = 2 }
+expected_monthly_cost = 225.92
+exact = true
+last_verified = "2026-06-09"
+

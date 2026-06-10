@@ -1,0 +1,28 @@
+kind         = "google_dataproc_metastore_service"
+display_name = "GCP Dataproc Metastore Service"
+provider     = "gcp"
+
+# STATIC: Dataproc Metastore isn't yet exposed in the
+# c3x-pricing-api backend (probed 2026-06-09). Published rates
+# (us-central1):
+#   - DEVELOPER tier:     $0.50/hour
+#   - ENTERPRISE tier:    $1.00/hour
+#   - ENTERPRISE_PLUS:    $3.20/hour
+# Plus $0.50/GB-month storage above the included quota.
+
+[[dimensions]]
+id       = "service_hours"
+label    = "Metastore service"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = '''
+  default(tier, "DEVELOPER") == "ENTERPRISE"      ? 1.00 :
+  default(tier, "DEVELOPER") == "ENTERPRISE_PLUS" ? 3.20 :
+                                                    0.50
+'''
+
+[fixture]
+attributes = { tier = "DEVELOPER" }
+expected_monthly_cost = 365
+exact = true
+last_verified = "2026-06-09"

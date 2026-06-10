@@ -1,0 +1,24 @@
+kind         = "azurerm_monitor_metric_alert"
+display_name = "Azure Monitor Metric Alert"
+provider     = "azure"
+
+# STATIC: Azure Monitor alert pricing is $0.10/metric-time-series/month
+# (standard), $0.50 for dynamic thresholds. Upstream productFamily
+# is "Management and Governance" but discriminating the alert SKU
+# from other monitor meters needs filters we can't reliably build.
+
+[[dimensions]]
+id       = "alert"
+label    = "Metric alert"
+unit     = "alert-months"
+quantity = "1"
+rate     = '''
+  default(criteria_metric_name_dynamic, false) ? 0.50 : 0.10
+'''
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 0.1
+exact = true
+last_verified = "2026-06-09"
+

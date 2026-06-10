@@ -1,0 +1,27 @@
+kind         = "google_compute_router_nat"
+display_name = "GCP Cloud NAT"
+provider     = "gcp"
+
+# Cloud NAT gateway: $0.0014/hr per VM ($0.044/VM-month). Data processed:
+# $0.045/GB. Use published rates.
+
+[[dimensions]]
+id       = "gateway_hours"
+label    = "NAT gateway VM-hours"
+unit     = "VM-hours"
+quantity = "default(active_vms, 1) * monthly_hours()"
+rate     = "0.0014"
+
+[[dimensions]]
+id       = "data_processed"
+label    = "Data processed"
+unit     = "GB"
+quantity = "default(monthly_data_processed_gb, 0)"
+rate     = "0.045"
+
+[fixture]
+attributes = { active_vms = 1, monthly_data_processed_gb = 100 }
+expected_monthly_cost = 5.52
+exact = true
+last_verified = "2026-06-09"
+

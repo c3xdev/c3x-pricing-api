@@ -1,0 +1,115 @@
+kind         = "google_compute_instance"
+display_name = "GCP Compute Instance"
+provider     = "gcp"
+
+# Cost components:
+#   compute     — predefined machine types price directly against the
+#                 backend's synthesized machine-type products
+#   custom vCPU/RAM — custom-* machine types decompose into N1/E2
+#                 core+RAM SKUs
+#   boot_disk   — persistent disk by type (pd-standard/balanced/ssd)
+#   gpu         — guest_accelerator (T4/L4 on-demand)
+#   local_ssd   — scratch_disk blocks × 375 GB
+
+[mappings.machine]
+service        = "Compute Engine"
+product_family = "Compute Instance"
+attribute_filters = [
+  { key = "machineType", expr = 'default(machine_type, "e2-medium")' },
+]
+
+[mappings.custom_core]
+service        = "Compute Engine"
+product_family = "Compute"
+attribute_filters = [
+  { key = "description", const = "Custom Instance Core running in Americas" },
+]
+
+[mappings.custom_ram]
+service        = "Compute Engine"
+product_family = "Compute"
+attribute_filters = [
+  { key = "description", const = "Custom Instance Ram running in Americas" },
+]
+
+[mappings.boot_disk]
+service        = "Compute Engine"
+product_family = "Storage"
+attribute_filters = [
+  { key = "description", expr = '''
+      default(boot_disk_initialize_params_type, "pd-standard") == "pd-ssd" ? "SSD backed PD Capacity" :
+      default(boot_disk_initialize_params_type, "pd-standard") == "pd-balanced" ? "Balanced PD Capacity" :
+                                                                                  "Storage PD Capacity"
+  ''' },
+]
+
+[mappings.gpu]
+service        = "Compute Engine"
+product_family = "Compute"
+attribute_filters = [
+  { key = "description", expr = '''
+      default(guest_accelerator_type, "nvidia-tesla-t4") == "nvidia-l4" ?
+        "Nvidia L4 GPU running in Americas" :
+        "Nvidia Tesla T4 GPU running in Americas"
+  ''' },
+]
+
+[mappings.local_ssd]
+service        = "Compute Engine"
+product_family = "Storage"
+attribute_filters = [
+  { key = "description", const = "SSD backed Local Storage" },
+]
+
+[[dimensions]]
+id       = "compute"
+label    = "Instance (on-demand)"
+unit     = "hours"
+when     = '!(default(machine_type, "e2-medium") startsWith "custom")'
+quantity = "monthly_hours()"
+rate     = 'price("machine")'
+
+[[dimensions]]
+id       = "custom_vcpu"
+label    = "Custom machine vCPU"
+unit     = "vCPU-hours"
+when     = 'default(machine_type, "e2-medium") startsWith "custom"'
+quantity = "default(vcpu_count, 2) * monthly_hours()"
+rate     = 'price("custom_core")'
+
+[[dimensions]]
+id       = "custom_ram"
+label    = "Custom machine RAM"
+unit     = "GiB-hours"
+when     = 'default(machine_type, "e2-medium") startsWith "custom"'
+quantity = "default(memory_gb, 4) * monthly_hours()"
+rate     = 'price("custom_ram")'
+
+[[dimensions]]
+id       = "boot_disk"
+label    = "Boot disk"
+unit     = "GB-month"
+when     = "default(boot_disk_initialize_params_size, 0) > 0"
+quantity = "default(boot_disk_initialize_params_size, 10)"
+rate     = 'price("boot_disk")'
+
+[[dimensions]]
+id       = "gpu"
+label    = "GPU accelerators"
+unit     = "GPU-hours"
+when     = "default(guest_accelerator_count, 0) > 0"
+quantity = "default(guest_accelerator_count, 0) * monthly_hours()"
+rate     = 'price("gpu")'
+
+[[dimensions]]
+id       = "local_ssd"
+label    = "Local SSD scratch disks (375 GB each)"
+unit     = "GB-month"
+when     = "count_blocks(scratch_disk) > 0"
+quantity = "count_blocks(scratch_disk) * 375"
+rate     = 'price("local_ssd")'
+
+[fixture]
+attributes = { machine_type = "e2-medium" }
+expected_monthly_cost = 24.46
+tolerance = 0.05

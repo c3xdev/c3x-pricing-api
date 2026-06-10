@@ -1,0 +1,55 @@
+kind         = "aws_amplify_app"
+display_name = "AWS Amplify Hosting App"
+provider     = "aws"
+
+# Amplify Hosting: build minutes + stored artifacts + data out.
+
+[mappings.build]
+service        = "AWSAmplify"
+product_family = "AWS Amplify"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-BuildDuration" },
+]
+
+[mappings.storage]
+service        = "AWSAmplify"
+product_family = "AWS Amplify"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-DataStorage" },
+]
+
+[mappings.transfer]
+service        = "AWSAmplify"
+product_family = "AWS Amplify"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-DataTransferOut" },
+]
+
+[[dimensions]]
+id       = "build_minutes"
+label    = "Build minutes"
+unit     = "minutes"
+quantity = "default(monthly_build_minutes, 0)"
+rate     = 'price("build")'
+when     = "default(monthly_build_minutes, 0) > 0"
+
+[[dimensions]]
+id       = "storage"
+label    = "Hosted storage"
+unit     = "GB-month"
+quantity = "default(monthly_storage_gb, 0)"
+rate     = 'price("storage")'
+when     = "default(monthly_storage_gb, 0) > 0"
+
+[[dimensions]]
+id       = "data_transfer"
+label    = "Data transfer out"
+unit     = "GB"
+quantity = "default(monthly_data_transfer_gb, 0)"
+rate     = 'price("transfer")'
+when     = "default(monthly_data_transfer_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_build_minutes = 500, monthly_data_transfer_gb = 15, monthly_storage_gb = 5 }
+expected_monthly_cost = 7.37
+tolerance = 0.05

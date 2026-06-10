@@ -1,0 +1,42 @@
+kind         = "azurerm_kubernetes_cluster"
+display_name = "Azure Kubernetes Service Cluster"
+provider     = "azure"
+
+# Compute (node pools) bills against azurerm_linux_virtual_machine through
+# the underlying VMSS. Only the AKS uptime SLA fee is billed here.
+
+[mappings.uptime_sla]
+service        = "Azure Kubernetes Service"
+product_family = "Compute"
+attribute_filters = [
+  { key = "skuName", const = "Standard" },
+]
+
+[[dimensions]]
+id       = "uptime_sla"
+label    = "Cluster uptime SLA"
+unit     = "hours"
+when     = 'default(sku_tier, "Free") == "Standard"'
+quantity = "monthly_hours()"
+rate     = 'price("uptime_sla")'
+
+[mappings.node_compute]
+service        = "Virtual Machines"
+product_family = "Compute"
+attribute_filters = [
+  { key = "skuName", expr = 'default(default_node_pool_vm_size, "Standard_D2s_v5")' },
+]
+
+[[dimensions]]
+id       = "default_node_pool"
+label    = "Default node pool"
+unit     = "instance-hours"
+when     = "default(default_node_pool_node_count, 0) > 0"
+quantity = "default(default_node_pool_node_count, 1) * monthly_hours()"
+rate     = 'price("node_compute")'
+
+[fixture]
+attributes = { sku_tier = "Standard" }
+expected_monthly_cost = 438
+tolerance = 0.05
+

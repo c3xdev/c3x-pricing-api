@@ -1,0 +1,32 @@
+kind         = "azurerm_private_dns_zone"
+display_name = "Azure Private DNS Zone"
+provider     = "azure"
+
+# Private DNS zones bill:
+#   - First 25 zones:           $0.50/zone/month
+#   - 26th–10,000th zone:       $0.10/zone/month
+#   - DNS queries:               $0.40 per million
+#
+# STATIC: meter isn't exposed by the upstream catalogue
+# (probed 2026-06-09).
+
+[[dimensions]]
+id       = "zone"
+label    = "Hosted zone"
+unit     = "months"
+quantity = "1"
+rate     = "0.50"
+
+[[dimensions]]
+id       = "queries"
+label    = "DNS queries"
+unit     = "1M-queries"
+quantity = "default(monthly_queries, 0) / 1000000"
+rate     = "0.40"
+when     = "default(monthly_queries, 0) > 0"
+
+[fixture]
+attributes = { monthly_queries = 1_000_000 }
+expected_monthly_cost = 0.9
+exact = true
+last_verified = "2026-06-09"

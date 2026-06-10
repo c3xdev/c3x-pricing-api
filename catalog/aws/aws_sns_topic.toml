@@ -1,0 +1,28 @@
+kind         = "aws_sns_topic"
+display_name = "AWS SNS Topic"
+provider     = "aws"
+
+# Note: SNS prices vary by delivery endpoint. Until a c3x-usage.yml
+# entry breaks down monthly deliveries by endpoint type, we price the
+# HTTP/HTTPS endpoint as the canonical "API request" cost.
+
+[mappings.http_delivery]
+service        = "AmazonSNS"
+product_family = "Message Delivery"
+attribute_filters = [
+  { key = "endpointType", const = "HTTP" },
+  { key = "usagetype",    const = "DeliveryAttempts-HTTP" },
+]
+
+[[dimensions]]
+id       = "deliveries"
+label    = "Notification deliveries (HTTP)"
+unit     = "deliveries"
+quantity = "default(monthly_requests, 0)"
+rate     = 'price("http_delivery")'
+
+[fixture]
+attributes = { monthly_requests = 1_000_000 }
+expected_monthly_cost = 0.6
+tolerance = 0.05
+

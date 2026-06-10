@@ -1,0 +1,25 @@
+kind         = "aws_config_config_rule"
+display_name = "AWS Config Rule"
+provider     = "aws"
+
+# Config rules bill per evaluation: $0.001 each for the first 100k.
+
+[mappings.evaluations]
+service        = "AWSConfig"
+product_family = "Management Tools - AWS Config Rules"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-ConfigRuleEvaluations" },
+]
+
+[[dimensions]]
+id       = "evaluations"
+label    = "Rule evaluations"
+unit     = "evaluations"
+quantity = "default(monthly_rule_evaluations, 0)"
+rate     = 'price("evaluations")'
+when     = "default(monthly_rule_evaluations, 0) > 0"
+
+[fixture]
+attributes = { monthly_rule_evaluations = 10000 }
+expected_monthly_cost = 10
+tolerance = 0.05

@@ -1,0 +1,51 @@
+kind         = "google_kms_crypto_key_version"
+display_name = "GCP KMS Crypto Key Version"
+provider     = "gcp"
+
+# Cloud KMS bills per active key version per month. The upstream
+# exposes one SKU per protection level:
+#   "Active software symmetric key versions"   $0.06
+#   "Active HSM symmetric key versions"        $1.00
+#   "Active external asymmetric key versions"  $3.00
+# Asymmetric HSM variants ($2.50, per-algorithm) are modelled via
+# the symmetric HSM meter ($1.00) — supply the exact algorithm
+# meter when that gap matters.
+# Per-operation charges ($0.03/10k) ride on usage, not modelled here.
+
+[mappings.software]
+service        = "Cloud Key Management Service (KMS)"
+product_family = "ApplicationServices"
+attribute_filters = [
+  { key = "description", const = "Active software symmetric key versions" },
+]
+
+[mappings.hsm]
+service        = "Cloud Key Management Service (KMS)"
+product_family = "ApplicationServices"
+attribute_filters = [
+  { key = "description", const = "Active HSM symmetric key versions" },
+]
+
+[mappings.external]
+service        = "Cloud Key Management Service (KMS)"
+product_family = "ApplicationServices"
+attribute_filters = [
+  { key = "description", const = "Active external asymmetric key versions" },
+]
+
+[[dimensions]]
+id       = "active_version"
+label    = "Active key version"
+unit     = "version-months"
+quantity = "1"
+rate     = '''
+  default(protection_level, "SOFTWARE") == "EXTERNAL" ? price("external") :
+  default(protection_level, "SOFTWARE") == "HSM"      ? price("hsm") :
+                                                        price("software")
+'''
+when     = 'default(state, "ENABLED") == "ENABLED"'
+
+[fixture]
+attributes = { protection_level = "SOFTWARE", state = "ENABLED" }
+expected_monthly_cost = 0.06
+tolerance = 0.05

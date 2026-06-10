@@ -1,0 +1,21 @@
+kind         = "aws_route53_resolver_endpoint"
+display_name = "AWS Route 53 Resolver Endpoint"
+provider     = "aws"
+
+# STATIC: Route 53 Resolver inbound/outbound endpoint hourly fees
+# aren't exposed in the upstream catalog. Published rate is
+# $0.125/IP-hour with at least 2 IPs required per endpoint.
+
+[[dimensions]]
+id       = "endpoint_hours"
+label    = "Resolver endpoint IPs"
+unit     = "ip-hours"
+quantity = "default(ip_address_count, 2) * monthly_hours()"
+rate     = "0.125"
+
+[fixture]
+attributes = { ip_address_count = 2 }
+expected_monthly_cost = 182.5
+exact = true
+last_verified = "2026-06-09"
+

@@ -1,0 +1,60 @@
+kind         = "aws_cloudtrail"
+display_name = "AWS CloudTrail"
+provider     = "aws"
+
+# CloudTrail pricing:
+#   - First management-events trail per account is FREE
+#   - Additional management-event trails: $2/100k events
+#   - Data-events: $0.10/100k events
+#   - Lake ingestion (Log groups w/ Lake): $0.50/GB
+#
+# The Terraform resource doesn't tell us whether this is the first
+# trail or an additional one; we conservatively price as additional
+# trail (matches enterprise estimates better than $0).
+
+[mappings.paid_events]
+service        = "AWSCloudTrail"
+product_family = "Management Tools - AWS CloudTrail Paid Events Recorded"
+attribute_filters = []
+
+[mappings.data_events]
+service        = "AWSCloudTrail"
+product_family = "Management Tools - AWS CloudTrail Data Events Recorded"
+attribute_filters = []
+
+[mappings.ingestion]
+service        = "AWSCloudTrail"
+product_family = "Management Tools - AWS CloudTrail"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-Ingestion-Bytes" },
+]
+
+[[dimensions]]
+id       = "management_events"
+label    = "Additional management events"
+unit     = "events"
+quantity = "default(monthly_management_events, 0)"
+rate     = 'price("paid_events")'
+when     = "default(monthly_management_events, 0) > 0"
+
+[[dimensions]]
+id       = "data_events"
+label    = "Data events"
+unit     = "events"
+quantity = "default(monthly_data_events, 0)"
+rate     = 'price("data_events")'
+when     = "default(monthly_data_events, 0) > 0"
+
+[[dimensions]]
+id       = "lake_ingestion"
+label    = "CloudTrail Lake ingestion"
+unit     = "GB"
+quantity = "default(monthly_lake_ingestion_gb, 0)"
+rate     = 'price("ingestion")'
+when     = "default(monthly_lake_ingestion_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_data_events = 1_000_000, monthly_lake_ingestion_gb = 10, monthly_management_events = 100_000 }
+expected_monthly_cost = 28
+tolerance = 0.05
+

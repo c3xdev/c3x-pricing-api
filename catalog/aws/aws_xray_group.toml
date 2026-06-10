@@ -1,0 +1,55 @@
+kind         = "aws_xray_group"
+display_name = "AWS X-Ray Group"
+provider     = "aws"
+
+# X-Ray bills per trace stored / accessed / insights-processed.
+
+[mappings.stored]
+service        = "AWSXRay"
+product_family = "Developer Tools"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-XRay-TracesStored" },
+]
+
+[mappings.accessed]
+service        = "AWSXRay"
+product_family = "Developer Tools"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-XRay-TracesAccessed" },
+]
+
+[mappings.insights]
+service        = "AWSXRay"
+product_family = "Developer Tools"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-XRay-InsightsTracesStored" },
+]
+
+[[dimensions]]
+id       = "traces_recorded"
+label    = "Traces recorded"
+unit     = "traces"
+quantity = "default(monthly_traces_recorded, 0)"
+rate     = 'price("stored")'
+when     = "default(monthly_traces_recorded, 0) > 0"
+
+[[dimensions]]
+id       = "traces_scanned"
+label    = "Traces retrieved/scanned"
+unit     = "traces"
+quantity = "default(monthly_traces_scanned, 0)"
+rate     = 'price("accessed")'
+when     = "default(monthly_traces_scanned, 0) > 0"
+
+[[dimensions]]
+id       = "insights_traces"
+label    = "Insights traces processed"
+unit     = "traces"
+quantity = "default(monthly_insights_traces, 0)"
+rate     = 'price("insights")'
+when     = "default(monthly_insights_traces, 0) > 0"
+
+[fixture]
+attributes = { monthly_traces_recorded = 10_000_000, monthly_traces_scanned = 1_000_000 }
+expected_monthly_cost = 50.5
+tolerance = 0.05

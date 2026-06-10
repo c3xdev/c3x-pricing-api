@@ -1,0 +1,27 @@
+kind         = "azurerm_synapse_workspace"
+display_name = "Azure Synapse Workspace"
+provider     = "azure"
+
+# LIVE: Serverless SQL Pool is exposed under `Azure Synapse Analytics`
+# / productName "Azure Synapse Analytics Serverless SQL Pool" (probed
+# 2026-06-09). Rate is $5/TB processed.
+
+[mappings.serverless_sql]
+service        = "Azure Synapse Analytics"
+product_family = "Analytics"
+attribute_filters = [
+  { key = "productName", const = "Azure Synapse Analytics Serverless SQL Pool" },
+  { key = "skuName",     const = "Standard" },
+]
+
+[[dimensions]]
+id       = "serverless_sql"
+label    = "Serverless SQL data processed"
+unit     = "TB"
+quantity = "default(monthly_serverless_sql_tb, 0)"
+rate     = 'price("serverless_sql")'
+
+[fixture]
+attributes = { monthly_serverless_sql_tb = 1 }
+expected_monthly_cost = 5
+tolerance = 0.05

@@ -1,0 +1,19 @@
+kind         = "aws_apigateway_account"
+display_name = "AWS Apigateway Account"
+provider     = "aws"
+
+# FREE: no per-resource AWS charge (billed via parent resource,
+# data plane, or no charge at all).
+
+[[dimensions]]
+id       = "free"
+label    = "Free resource"
+unit     = "n/a"
+quantity = "0"
+rate     = "0"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 0
+exact = true
+

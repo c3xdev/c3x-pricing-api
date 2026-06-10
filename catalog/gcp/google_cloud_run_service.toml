@@ -1,0 +1,39 @@
+kind         = "google_cloud_run_service"
+display_name = "GCP Cloud Run Service"
+provider     = "gcp"
+
+[mappings.cpu]
+service        = "Cloud Run"
+product_family = "ApplicationServices"
+region         = "global"
+attribute_filters = [
+  { key = "description", const = "Services CPU (Request-based billing)" },
+]
+
+[mappings.memory]
+service        = "Cloud Run"
+product_family = "ApplicationServices"
+region         = "global"
+attribute_filters = [
+  { key = "description", const = "Services Memory (Request-based billing)" },
+]
+
+[[dimensions]]
+id       = "cpu_seconds"
+label    = "vCPU allocation time"
+unit     = "vCPU-seconds"
+quantity = "default(monthly_cpu_seconds, 0)"
+rate     = 'price("cpu")'
+
+[[dimensions]]
+id       = "memory_seconds"
+label    = "Memory allocation time"
+unit     = "GiB-seconds"
+quantity = "default(monthly_memory_gib_seconds, 0)"
+rate     = 'price("memory")'
+
+[fixture]
+attributes = { monthly_cpu_seconds = 10_000, monthly_memory_gib_seconds = 10_000, monthly_requests = 1_000_000 }
+expected_monthly_cost = 0.27
+tolerance = 0.05
+

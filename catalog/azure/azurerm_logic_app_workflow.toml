@@ -1,0 +1,29 @@
+kind         = "azurerm_logic_app_workflow"
+display_name = "Azure Logic App (Consumption)"
+provider     = "azure"
+
+# Consumption-plan workflows bill per action execution. Built-in
+# actions are the base meter ($0.000025/action); Standard and
+# Enterprise connector calls cost more and can be modelled via the
+# usage file when they dominate.
+
+[mappings.actions]
+service        = "Logic Apps"
+product_family = "Integration"
+attribute_filters = [
+  { key = "skuName",   const = "Consumption" },
+  { key = "meterName", const = "Consumption Built-in Actions" },
+]
+
+[[dimensions]]
+id       = "actions"
+label    = "Built-in action executions"
+unit     = "actions"
+quantity = "default(monthly_actions, 0)"
+rate     = 'price("actions")'
+when     = "default(monthly_actions, 0) > 0"
+
+[fixture]
+attributes = { monthly_actions = 1_000_000 }
+expected_monthly_cost = 25
+tolerance = 0.05

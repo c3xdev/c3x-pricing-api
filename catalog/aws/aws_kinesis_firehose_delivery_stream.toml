@@ -1,0 +1,26 @@
+kind         = "aws_kinesis_firehose_delivery_stream"
+display_name = "AWS Kinesis Data Firehose"
+provider     = "aws"
+
+# Direct PUT ingestion is billed under "Batch Processing" group with the
+# usagetype USE1-IncrementalProcessedBytes ($0.03/GB first 500 TB tier).
+
+[mappings.ingestion]
+service        = "AmazonKinesisFirehose"
+product_family = "Kinesis Firehose"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-IncrementalProcessedBytes" },
+]
+
+[[dimensions]]
+id       = "ingestion"
+label    = "Direct PUT ingestion"
+unit     = "GB"
+quantity = "default(monthly_ingestion_gb, 0)"
+rate     = 'price("ingestion")'
+
+[fixture]
+attributes = { monthly_ingestion_gb = 100 }
+expected_monthly_cost = 4.5
+tolerance = 0.05
+

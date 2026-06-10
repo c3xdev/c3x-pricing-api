@@ -1,0 +1,18 @@
+kind         = "google_logging_metric"
+display_name = "GCP Logging Metric"
+provider     = "gcp"
+
+# FREE: no per-resource GCP charge (parent or data plane bills).
+
+[[dimensions]]
+id       = "free"
+label    = "Free resource"
+unit     = "n/a"
+quantity = "0"
+rate     = "0"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 0
+exact = true
+

@@ -1,0 +1,39 @@
+kind         = "aws_apigatewayv2_api"
+display_name = "AWS API Gateway (HTTP/WebSocket)"
+provider     = "aws"
+
+[mappings.http]
+service        = "AmazonApiGateway"
+product_family = "API Calls"
+attribute_filters = [
+  { key = "operation", const = "ApiGatewayHttpApi" },
+]
+
+[mappings.websocket]
+service        = "AmazonApiGateway"
+product_family = "API Calls"
+attribute_filters = [
+  { key = "operation", const = "ApiGatewayWebSocketApi" },
+]
+
+[[dimensions]]
+id       = "http_requests"
+label    = "HTTP API requests"
+unit     = "requests"
+when     = 'default(protocol_type, "HTTP") == "HTTP"'
+quantity = "default(monthly_requests, 0)"
+rate     = 'price("http")'
+
+[[dimensions]]
+id       = "websocket_messages"
+label    = "WebSocket messages"
+unit     = "messages"
+when     = 'default(protocol_type, "HTTP") == "WEBSOCKET"'
+quantity = "default(monthly_messages, 0)"
+rate     = 'price("websocket")'
+
+[fixture]
+attributes = { monthly_requests = 1_000_000, protocol_type = "HTTP" }
+expected_monthly_cost = 1
+tolerance = 0.05
+

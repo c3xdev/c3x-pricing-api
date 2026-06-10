@@ -1,0 +1,20 @@
+kind         = "google_compute_vpn_tunnel"
+display_name = "GCP Cloud VPN Tunnel"
+provider     = "gcp"
+
+# STATIC: Cloud VPN tunnel pricing isn't exposed in the backend's
+# Networking scrape (probed 2026-06-09). Published rate:
+# $0.05/tunnel-hour (us-central1; uniform across most regions).
+
+[[dimensions]]
+id       = "tunnel_hours"
+label    = "VPN tunnel"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = "0.05"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 36.5
+exact = true
+last_verified = "2026-06-09"

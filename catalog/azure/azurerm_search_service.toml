@@ -1,0 +1,39 @@
+kind         = "azurerm_search_service"
+display_name = "Azure AI Search"
+provider     = "azure"
+
+# Azure AI Search bills per-search-unit-hour. SKU tiers:
+#   - Free     → $0
+#   - Basic    → $0.1111/hour ≈ $81/month
+#   - Standard S1 → ~$0.34/hour
+#   - Standard S2 → ~$1.48/hour
+#   - Storage Optimized L1/L2 → ~$8.44/hour
+
+[mappings.unit]
+service        = "Azure Cognitive Search"
+product_family = "Web"
+attribute_filters = [
+  { key = "productName", const = "Azure AI Search" },
+  { key = "skuName", expr = '''
+      default(sku, "basic") == "free"     ? "Free" :
+      default(sku, "basic") == "basic"    ? "Basic CC" :
+      default(sku, "basic") == "standard" ? "Standard CC" :
+      default(sku, "basic") == "standard2" ? "Standard S2 CC" :
+      default(sku, "basic") == "standard3" ? "Standard S3 CC" :
+      default(sku, "basic") == "storage_optimized_l1" ? "Storage Optimized L1 CC" :
+      default(sku, "basic") == "storage_optimized_l2" ? "Storage Optimized L2 CC" :
+                                                       "Basic CC"
+  ''' },
+]
+
+[[dimensions]]
+id       = "search_unit_hours"
+label    = "Search unit"
+unit     = "unit-hours"
+quantity = "default(replica_count, 1) * default(partition_count, 1) * monthly_hours()"
+rate     = 'price("unit")'
+
+[fixture]
+attributes = { sku = "basic", replica_count = 1, partition_count = 1 }
+expected_monthly_cost = 81.10
+tolerance = 0.05

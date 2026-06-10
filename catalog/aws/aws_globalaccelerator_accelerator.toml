@@ -1,0 +1,30 @@
+kind         = "aws_globalaccelerator_accelerator"
+display_name = "AWS Global Accelerator"
+provider     = "aws"
+
+# STATIC: AWSGlobalAccelerator has no products in the upstream
+# catalog (probed 2026-06-08). Published rates:
+#   - Fixed fee:               $0.025/accelerator-hour
+#   - Data transfer premium:   $0.015/GB (varies by region)
+
+[[dimensions]]
+id       = "accelerator_hours"
+label    = "Accelerator"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = "0.025"
+
+[[dimensions]]
+id       = "data_premium"
+label    = "Data transfer premium"
+unit     = "GB"
+quantity = "default(monthly_data_transfer_gb, 0)"
+rate     = "0.015"
+when     = "default(monthly_data_transfer_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_data_transfer_gb = 100 }
+expected_monthly_cost = 19.75
+exact = true
+last_verified = "2026-06-09"
+

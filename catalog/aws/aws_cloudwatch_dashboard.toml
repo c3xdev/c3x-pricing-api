@@ -1,0 +1,21 @@
+kind         = "aws_cloudwatch_dashboard"
+display_name = "AWS CloudWatch Dashboard"
+provider     = "aws"
+
+# STATIC: $3/dashboard/month after the first 3 free per account.
+# We model the worst case (a paid dashboard) — users can override
+# with monthly_dashboard_cost = 0 for one of their free three.
+
+[[dimensions]]
+id       = "dashboard"
+label    = "Dashboard"
+unit     = "months"
+quantity = "1"
+rate     = "3.0"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 3
+exact = true
+last_verified = "2026-06-09"
+

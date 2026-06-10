@@ -1,0 +1,29 @@
+kind         = "google_container_node_pool"
+display_name = "GCP GKE Node Pool"
+provider     = "gcp"
+
+# Node pools bill via the Compute Engine instances they run:
+# node_count × node_config.machine_type (on-demand). Autoscaling
+# pools use initial_node_count as the baseline.
+
+[mappings.node]
+service        = "Compute Engine"
+product_family = "Compute Instance"
+attribute_filters = [
+  { key = "machineType", expr = 'default(node_config_machine_type, "e2-medium")' },
+]
+
+[[dimensions]]
+id       = "nodes"
+label    = "Node instances (on-demand)"
+unit     = "instance-hours"
+quantity = '''
+  (default(node_count, 0) > 0 ? default(node_count, 0) : default(initial_node_count, 1)) * monthly_hours()
+'''
+rate     = 'price("node")'
+
+[fixture]
+# 3 × e2-standard-4 ($0.134/hr) × 730 = $293.53
+attributes = { node_count = 3, node_config = { machine_type = "e2-standard-4" } }
+expected_monthly_cost = 293.53
+tolerance = 0.05

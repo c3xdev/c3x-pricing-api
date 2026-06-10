@@ -1,0 +1,29 @@
+kind         = "azurerm_mariadb_server"
+display_name = "Azure Database for MariaDB"
+provider     = "azure"
+
+# STATIC: MariaDB single-server SKUs are partly indexed but
+# productName / skuName combinations aren't cleanly addressable.
+# Use published General Purpose Gen5 rate as the default
+# (~$0.121/vCore-hour, us-east-1 equivalent).
+
+[[dimensions]]
+id       = "compute"
+label    = "MariaDB compute"
+unit     = "vCore-hours"
+quantity = "default(vcores, 2) * monthly_hours()"
+rate     = "0.121"
+
+[[dimensions]]
+id       = "storage"
+label    = "Storage"
+unit     = "GB-month"
+quantity = "default(storage_mb, 5120) / 1024"
+rate     = "0.115"
+
+[fixture]
+attributes = { storage_mb = 51200, vcores = 2 }
+expected_monthly_cost = 182.41
+exact = true
+last_verified = "2026-06-09"
+

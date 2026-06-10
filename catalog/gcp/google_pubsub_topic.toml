@@ -1,0 +1,29 @@
+kind         = "google_pubsub_topic"
+display_name = "GCP Pub/Sub Topic"
+provider     = "gcp"
+
+# Pub/Sub message-delivery pricing is exposed under a global (not
+# per-region) ApplicationServices product. The upstream returns a
+# free-tier $0 entry followed by the $40/TiB on-demand rate; the
+# HTTP source's max-non-zero pricer picks the paid rate.
+
+[mappings.throughput]
+service        = "Cloud Pub/Sub"
+product_family = "ApplicationServices"
+region         = "global"
+attribute_filters = [
+  { key = "description", const = "Message Delivery Basic" },
+]
+
+[[dimensions]]
+id       = "throughput"
+label    = "Topic throughput"
+unit     = "TB"
+quantity = "default(monthly_throughput_tb, 0)"
+rate     = 'price("throughput")'
+
+[fixture]
+attributes = { monthly_throughput_tb = 1 }
+expected_monthly_cost = 40
+tolerance = 0.05
+

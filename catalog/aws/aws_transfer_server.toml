@@ -1,0 +1,40 @@
+kind         = "aws_transfer_server"
+display_name = "AWS Transfer Family Server"
+provider     = "aws"
+
+# Transfer Family (SFTP/FTPS/FTP) bills per protocol-hour the
+# endpoint is enabled + per-GB uploaded/downloaded.
+
+[mappings.protocol_hours]
+service        = "AWSTransfer"
+product_family = "AWS Transfer Family"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-ProtocolHours" },
+]
+
+[mappings.upload]
+service        = "AWSTransfer"
+product_family = "AWS Transfer Family"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-UploadBytes" },
+]
+
+[[dimensions]]
+id       = "protocol_hours"
+label    = "Server endpoint"
+unit     = "protocol-hours"
+quantity = "default(protocol_count, 1) * monthly_hours()"
+rate     = 'price("protocol_hours")'
+
+[[dimensions]]
+id       = "data_upload"
+label    = "Data uploaded"
+unit     = "GB"
+quantity = "default(monthly_upload_gb, 0)"
+rate     = 'price("upload")'
+when     = "default(monthly_upload_gb, 0) > 0"
+
+[fixture]
+attributes = { protocol_count = 1, monthly_upload_gb = 0 }
+expected_monthly_cost = 219
+tolerance = 0.05

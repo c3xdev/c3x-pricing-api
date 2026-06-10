@@ -1,0 +1,24 @@
+kind         = "aws_cloudhsm_v2_hsm"
+display_name = "AWS CloudHSM v2 HSM"
+provider     = "aws"
+
+# CloudHSM v2 bills a flat hourly rate per HSM instance.
+
+[mappings.hsm]
+service        = "CloudHSM"
+product_family = "Dedicated-Host"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-CloudHSMv2Usage" },
+]
+
+[[dimensions]]
+id       = "hsm_hours"
+label    = "HSM instance"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("hsm")'
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 1168
+tolerance = 0.05

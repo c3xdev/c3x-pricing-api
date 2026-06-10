@@ -1,0 +1,47 @@
+kind         = "aws_apprunner_service"
+display_name = "AWS App Runner Service"
+provider     = "aws"
+
+# App Runner pricing model:
+#   - Provisioned (idle-ready) container instances bill MEMORY only:
+#     $0.007/GB-hour.
+#   - While actively serving requests, vCPU is added: $0.064/vCPU-hr
+#     (plus the same memory meter).
+#
+# Earlier revisions of this TOML wrongly billed provisioned vCPU;
+# AWS does not charge vCPU for idle provisioned instances.
+
+[mappings.memory]
+service        = "AWSAppRunner"
+product_family = "Compute"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-AppRunner-Provisioned-GB-hours" },
+]
+
+[mappings.vcpu]
+service        = "AWSAppRunner"
+product_family = "Compute"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-AppRunner-vCPU-hours" },
+]
+
+[[dimensions]]
+id       = "provisioned_memory"
+label    = "Provisioned memory"
+unit     = "GB-hours"
+quantity = "default(memory, 2) * monthly_hours()"
+rate     = 'price("memory")'
+
+[[dimensions]]
+id       = "active_vcpu"
+label    = "Active vCPU"
+unit     = "vCPU-hours"
+quantity = "default(monthly_active_vcpu_hours, 0)"
+rate     = 'price("vcpu")'
+when     = "default(monthly_active_vcpu_hours, 0) > 0"
+
+[fixture]
+# memory=2 GB idle: 2 × 730 × $0.007 = $10.22
+attributes = { cpu = 1, memory = 2, monthly_active_vcpu_hours = 0 }
+expected_monthly_cost = 10.22
+tolerance = 0.05

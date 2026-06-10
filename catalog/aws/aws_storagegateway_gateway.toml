@@ -1,0 +1,22 @@
+kind         = "aws_storagegateway_gateway"
+display_name = "AWS Storage Gateway"
+provider     = "aws"
+
+# STATIC: AmazonStorageGateway has 0 upstream products (probed
+# 2026-06-08). Published rate: $0.01/GB written (S3 File / FSx
+# File). Backing S3 storage bills separately.
+
+[[dimensions]]
+id       = "data_written"
+label    = "Data written"
+unit     = "GB"
+quantity = "default(monthly_data_written_gb, 0)"
+rate     = "0.01"
+when     = "default(monthly_data_written_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_data_written_gb = 1000 }
+expected_monthly_cost = 10
+exact = true
+last_verified = "2026-06-09"
+

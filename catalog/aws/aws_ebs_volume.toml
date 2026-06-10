@@ -1,0 +1,62 @@
+kind         = "aws_ebs_volume"
+display_name = "AWS EBS Volume"
+provider     = "aws"
+
+[mappings.storage]
+service        = "AmazonEC2"
+product_family = "Storage"
+attribute_filters = [
+  { key = "volumeApiName", expr = 'default(type, "gp3")' },
+]
+
+[[dimensions]]
+id       = "storage"
+label    = "Storage"
+unit     = "GB-month"
+quantity = "default(size, 100)"
+rate     = 'price("storage")'
+
+[mappings.iops]
+service        = "AmazonEC2"
+product_family = "System Operation"
+attribute_filters = [
+  { key = "usagetype", expr = """
+      default(type, "gp3") == "gp3" ? "EBS:VolumeP-IOPS.gp3" :
+      default(type, "gp3") == "io2" ? "EBS:VolumeP-IOPS.io2" :
+                                      "EBS:VolumeP-IOPS.piops"
+  """ },
+]
+
+[mappings.throughput]
+service        = "AmazonEC2"
+product_family = "Provisioned Throughput"
+attribute_filters = [
+  { key = "usagetype", const = "EBS:VolumeP-Throughput.gp3" },
+]
+
+[[dimensions]]
+id       = "provisioned_iops"
+label    = "Provisioned IOPS"
+unit     = "IOPS-month"
+when     = """
+  (default(type, "gp3") == "gp3" && default(iops, 3000) > 3000) ||
+  (default(type, "gp3") in ["io1", "io2"] && default(iops, 0) > 0)
+"""
+quantity = """
+  default(type, "gp3") == "gp3" ? default(iops, 3000) - 3000 : default(iops, 0)
+"""
+rate     = 'price("iops")'
+
+[[dimensions]]
+id       = "provisioned_throughput"
+label    = "Provisioned throughput above 125 MB/s"
+unit     = "GiBps-month"
+when     = 'default(type, "gp3") == "gp3" && default(throughput, 125) > 125'
+quantity = "(default(throughput, 125) - 125) / 1024"
+rate     = 'price("throughput")'
+
+[fixture]
+attributes = { size = 100, type = "gp3" }
+expected_monthly_cost = 8
+tolerance = 0.05
+

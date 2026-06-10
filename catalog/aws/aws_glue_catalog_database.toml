@@ -1,0 +1,30 @@
+kind         = "aws_glue_catalog_database"
+display_name = "AWS Glue Data Catalog Database"
+provider     = "aws"
+
+# Glue Data Catalog stores schemas + table metadata. First 1M
+# objects per month and 1M API calls are FREE; beyond, $1.00 per
+# 100,000 objects stored above the free quota.
+
+[mappings.storage]
+service        = "AWSGlue"
+product_family = "AWS Glue"
+attribute_filters = [
+  { key = "group", const = "Data catalog storage" },
+]
+
+[[dimensions]]
+id       = "catalog_objects"
+label    = "Catalog objects (above free 1M)"
+unit     = "objects"
+quantity = '''
+  default(monthly_catalog_objects, 0) > 1000000 ?
+    (default(monthly_catalog_objects, 0) - 1000000) : 0
+'''
+rate     = 'price("storage")'
+when     = "default(monthly_catalog_objects, 0) > 1000000"
+
+[fixture]
+attributes = { monthly_catalog_objects = 0 }
+expected_monthly_cost = 0
+exact = true

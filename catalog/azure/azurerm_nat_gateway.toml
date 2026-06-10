@@ -1,0 +1,43 @@
+kind         = "azurerm_nat_gateway"
+display_name = "Azure NAT Gateway"
+provider     = "azure"
+
+# NAT Gateway bills per-gateway-hour + per-GB processed.
+
+[mappings.gateway]
+service        = "NAT Gateway"
+product_family = "Networking"
+region         = "Global"
+attribute_filters = [
+  { key = "skuName",   const = "Standard" },
+  { key = "meterName", const = "Standard Gateway" },
+]
+
+[mappings.data]
+service        = "NAT Gateway"
+product_family = "Networking"
+region         = "Global"
+attribute_filters = [
+  { key = "skuName",   const = "Standard" },
+  { key = "meterName", const = "Standard Data Processed" },
+]
+
+[[dimensions]]
+id       = "gateway_hours"
+label    = "NAT gateway"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("gateway")'
+
+[[dimensions]]
+id       = "data_processed"
+label    = "Data processed"
+unit     = "GB"
+quantity = "default(monthly_data_processed_gb, 0)"
+rate     = 'price("data")'
+when     = "default(monthly_data_processed_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_data_processed_gb = 100 }
+expected_monthly_cost = 37.35
+tolerance = 0.05

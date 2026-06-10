@@ -1,0 +1,27 @@
+kind         = "azurerm_postgresql_flexible_server"
+display_name = "Azure Database for PostgreSQL Flexible Server"
+provider     = "azure"
+
+# Default to Standard_D2ads_v5 (2 vCore General Purpose, the smallest Dv5
+# tier suitable for production). Other tiers require their own mapping.
+
+[mappings.compute_d2ads_v5]
+service        = "Azure Database for PostgreSQL"
+product_family = "Databases"
+attribute_filters = [
+  { key = "armSkuName", const = "Standard_D2ads_v5" },
+  { key = "meterName",  const = "vCore" },
+]
+
+[[dimensions]]
+id       = "compute"
+label    = "Database compute (D2ads_v5, 2 vCore)"
+unit     = "vCore-hours"
+quantity = "2 * monthly_hours()"
+rate     = 'price("compute_d2ads_v5")'
+
+[fixture]
+attributes = { sku_name = "B_Standard_B1ms", storage_mb = 32768 }
+expected_monthly_cost = 259.88
+tolerance = 0.05
+

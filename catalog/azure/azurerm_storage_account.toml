@@ -1,0 +1,29 @@
+kind         = "azurerm_storage_account"
+display_name = "Azure Storage Account"
+provider     = "azure"
+
+# Specific filter: Hot LRS blob storage. Production usage may use other
+# tiers (Cool, Cold, Archive, ZRS/GRS replication) — covered by alternate
+# mappings below. We pick Hot+LRS as the default since it's the most
+# common; configure tier via c3x-usage.yml to switch.
+
+[mappings.blob_hot]
+service        = "Storage"
+product_family = "Storage"
+attribute_filters = [
+  { key = "meterName",   const = "Hot LRS Data Stored" },
+  { key = "productName", const = "General Block Blob v2 Hierarchical Namespace" },
+]
+
+[[dimensions]]
+id       = "blob_storage"
+label    = "Blob storage (Hot LRS)"
+unit     = "GB-month"
+quantity = "default(monthly_storage_gb, 0)"
+rate     = 'price("blob_hot")'
+
+[fixture]
+attributes = { monthly_storage_gb = 100 }
+expected_monthly_cost = 2.1
+tolerance = 0.05
+

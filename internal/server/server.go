@@ -175,6 +175,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/readyz", instrument("readyz", s.handleReadiness))
 	mux.HandleFunc("/health", instrument("readyz", s.handleReadiness)) // backward compat
 	mux.HandleFunc("/status", instrument("status", s.handleStatus))
+	mux.HandleFunc("/catalog", instrument("catalog", handleCatalog))
 
 	// Serve /metrics on a separate admin port if configured, otherwise on the main mux.
 	if s.cfg.MetricsPort != "" && s.cfg.MetricsPort != "0" {

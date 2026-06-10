@@ -1,0 +1,32 @@
+kind         = "aws_db_proxy"
+display_name = "AWS RDS Proxy"
+provider     = "aws"
+
+# LIVE: the upstream catalogue exposes RDS Proxy under
+# `productFamily = "RDSProxy"` (probed 2026-06-09). Rate is
+# $0.015/vCPU-hour, uniform across engines.
+
+[mappings.proxy]
+service        = "AmazonRDS"
+product_family = "RDSProxy"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-RDS:ProxyUsage" },
+  # Pin databaseEngine to a value that appears in the catalogue.
+  # Engine choice doesn't change the per-vCPU-hour rate ($0.015
+  # across all of them).
+  { key = "databaseEngine", const = "Any" },
+]
+
+[[dimensions]]
+id       = "proxy_vcpu_hours"
+label    = "Proxy vCPU"
+unit     = "vCPU-hours"
+quantity = '''
+  default(monthly_proxy_vcpu_hours, default(target_vcpu_count, 2) * monthly_hours())
+'''
+rate     = 'price("proxy")'
+
+[fixture]
+attributes = { target_vcpu_count = 2 }
+expected_monthly_cost = 21.9
+tolerance = 0.05

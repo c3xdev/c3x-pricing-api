@@ -1,0 +1,42 @@
+kind         = "google_dns_managed_zone"
+display_name = "GCP Cloud DNS Managed Zone"
+provider     = "gcp"
+
+# Cloud DNS bills per managed zone per month + per million queries.
+# Both meters are global.
+
+[mappings.zone]
+service        = "Cloud DNS"
+product_family = "Network"
+region         = "global"
+attribute_filters = [
+  { key = "description", const = "ManagedZone" },
+]
+
+[mappings.queries]
+service        = "Cloud DNS"
+product_family = "Network"
+region         = "global"
+attribute_filters = [
+  { key = "description", const = "DNS Query (port 53)" },
+]
+
+[[dimensions]]
+id       = "zone"
+label    = "Managed zone"
+unit     = "zone-months"
+quantity = "1"
+rate     = 'price("zone")'
+
+[[dimensions]]
+id       = "queries"
+label    = "DNS queries"
+unit     = "queries"
+quantity = "default(monthly_queries, 0)"
+rate     = 'price("queries")'
+when     = "default(monthly_queries, 0) > 0"
+
+[fixture]
+attributes = { monthly_queries = 1_000_000 }
+expected_monthly_cost = 0.6
+tolerance = 0.05

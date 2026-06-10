@@ -1,0 +1,28 @@
+kind         = "aws_emr_cluster"
+display_name = "AWS EMR Cluster"
+provider     = "aws"
+
+# EMR service charge per instance-hour (the surcharge on top of the
+# underlying EC2 cost, which bills via aws_instance). The upstream
+# usagetype is `BoxUsage:<instance type>`.
+
+[mappings.service_charge]
+service        = "ElasticMapReduce"
+product_family = "Elastic Map Reduce Instance"
+attribute_filters = [
+  { key = "usagetype", expr = '"BoxUsage:" + default(core_instance_type, "m5.xlarge")' },
+]
+
+[[dimensions]]
+id       = "service_charge"
+label    = "EMR service charge"
+unit     = "node-hours"
+quantity = '''
+  (1 + default(core_instance_count, 2) + default(task_instance_count, 0)) * monthly_hours()
+'''
+rate     = 'price("service_charge")'
+
+[fixture]
+attributes = { core_instance_count = 2, core_instance_type = "m5.xlarge", task_instance_count = 0 }
+expected_monthly_cost = 105.12
+tolerance = 0.05

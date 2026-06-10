@@ -1,0 +1,21 @@
+kind         = "azurerm_linux_function_app"
+display_name = "Azure Functions App"
+provider     = "azure"
+
+[mappings.executions]
+service        = "Functions"
+product_family = "Compute"
+attribute_filters = []
+
+[[dimensions]]
+id       = "executions"
+label    = "Executions"
+unit     = "1M executions"
+quantity = "default(monthly_executions, 0) / 1000000"
+rate     = 'price("executions")'
+
+[fixture]
+attributes = { monthly_executions = 1_000_000 }
+expected_monthly_cost = 0.17
+tolerance = 0.05
+

@@ -1,0 +1,28 @@
+kind         = "google_bigquery_dataset"
+display_name = "GCP BigQuery Dataset"
+provider     = "gcp"
+
+# BigQuery on-demand query analysis: $6.25 per TiB scanned (first 1 TiB
+# per project per month is free). Use published rate.
+
+[mappings.analysis]
+service        = "BigQuery"
+product_family = "ApplicationServices"
+region         = "us-central1"
+attribute_filters = [
+  { key = "description", const = "Analysis (us-central1)" },
+]
+
+[[dimensions]]
+id       = "on_demand_queries"
+label    = "On-demand query analysis"
+unit     = "TB"
+quantity = "default(monthly_query_tb, 0)"
+rate     = 'price("analysis")'
+
+[fixture]
+attributes = { monthly_query_tb = 1 }
+expected_monthly_cost = 6.25
+exact = true
+last_verified = "2026-06-09"
+

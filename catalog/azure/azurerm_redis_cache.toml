@@ -1,0 +1,58 @@
+kind         = "azurerm_redis_cache"
+display_name = "Azure Cache for Redis"
+provider     = "azure"
+
+# Azure Redis Cache pricing is per-instance per-hour, by SKU + capacity.
+# The catalog exposes each tier under productName "Azure Redis Cache <Tier>"
+# with meterName "<SKU> Cache Instance". Default to C0 Basic if not set.
+
+[mappings.redis_c0]
+service        = "Redis Cache"
+product_family = "Databases"
+attribute_filters = [
+  { key = "meterName", const = "C0 Cache Instance" },
+]
+
+[mappings.redis_c1]
+service        = "Redis Cache"
+product_family = "Databases"
+attribute_filters = [
+  { key = "meterName", const = "C1 Cache Instance" },
+]
+
+[mappings.redis_c2]
+service        = "Redis Cache"
+product_family = "Databases"
+attribute_filters = [
+  { key = "meterName", const = "C2 Cache Instance" },
+]
+
+[[dimensions]]
+id       = "redis_hours"
+label    = "Redis Cache (C0)"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("redis_c0")'
+when     = 'default(family, "C") == "C" && default(capacity, 0) == 0'
+
+[[dimensions]]
+id       = "redis_hours_c1"
+label    = "Redis Cache (C1)"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("redis_c1")'
+when     = 'default(family, "C") == "C" && default(capacity, 0) == 1'
+
+[[dimensions]]
+id       = "redis_hours_c2"
+label    = "Redis Cache (C2)"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("redis_c2")'
+when     = 'default(family, "C") == "C" && default(capacity, 0) == 2'
+
+[fixture]
+attributes = { sku_name = "Basic" }
+expected_monthly_cost = 20.08
+tolerance = 0.05
+

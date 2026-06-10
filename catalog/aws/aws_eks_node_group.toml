@@ -1,0 +1,40 @@
+kind         = "aws_eks_node_group"
+display_name = "AWS EKS Node Group"
+provider     = "aws"
+
+# Managed node groups bill via the EC2 instances they launch:
+# scaling_config.desired_size × the first instance_types entry
+# (Linux on-demand). The terraform shape:
+#
+#   scaling_config { desired_size = 3 ... }
+#   instance_types = ["m5.large"]
+#
+# Spot capacity_type is not discounted here — spot prices float and
+# any fixed number would be wrong; the on-demand rate is the
+# conservative ceiling.
+
+[mappings.compute]
+service        = "AmazonEC2"
+product_family = "Compute Instance"
+attribute_filters = [
+  { key = "instanceType", expr = '''
+      count_blocks(instance_types) > 0 ? string(instance_types[0]) : "t3.medium"
+  ''' },
+  { key = "operatingSystem", const = "Linux" },
+  { key = "preInstalledSw",  const = "NA" },
+  { key = "tenancy",         const = "Shared" },
+  { key = "capacitystatus",  const = "Used" },
+]
+
+[[dimensions]]
+id       = "node_compute"
+label    = "Node instances (Linux/UNIX, on-demand)"
+unit     = "instance-hours"
+quantity = "default(scaling_config_desired_size, 1) * monthly_hours()"
+rate     = 'price("compute")'
+
+[fixture]
+# 3 × m5.large ($0.096/hr) × 730 = $210.24
+attributes = { instance_types = ["m5.large"], scaling_config = { desired_size = 3 } }
+expected_monthly_cost = 210.24
+tolerance = 0.05

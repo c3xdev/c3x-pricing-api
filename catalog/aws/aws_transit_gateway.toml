@@ -1,0 +1,26 @@
+kind         = "aws_transit_gateway"
+display_name = "AWS Transit Gateway"
+provider     = "aws"
+
+# Transit Gateway pricing is exposed under service AmazonVPC, not AmazonEC2:
+# per-GB data processed at $0.02/GB. Per-attachment $0.05/hr.
+
+[mappings.data_processing]
+service        = "AmazonVPC"
+product_family = ""
+attribute_filters = [
+  { key = "usagetype", const = "USE1-TransitGateway-Bytes" },
+]
+
+[[dimensions]]
+id       = "data_processed"
+label    = "Transit Gateway data processed"
+unit     = "GB"
+quantity = "default(monthly_data_processed_gb, 0)"
+rate     = 'price("data_processing")'
+
+[fixture]
+attributes = { monthly_data_processed_gb = 100 }
+expected_monthly_cost = 2
+tolerance = 0.05
+

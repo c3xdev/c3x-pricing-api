@@ -1,0 +1,39 @@
+kind         = "aws_networkfirewall_firewall"
+display_name = "AWS Network Firewall"
+provider     = "aws"
+
+# Network Firewall bills per endpoint-hour + per-GB processed.
+
+[mappings.endpoint]
+service        = "AWSNetworkFirewall"
+product_family = "AWS Firewall"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-Endpoint-Hour" },
+]
+
+[mappings.traffic]
+service        = "AWSNetworkFirewall"
+product_family = "AWS Firewall"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-Traffic-GB-Processed" },
+]
+
+[[dimensions]]
+id       = "endpoint_hours"
+label    = "Firewall endpoint"
+unit     = "hours"
+quantity = "default(endpoint_count, 1) * monthly_hours()"
+rate     = 'price("endpoint")'
+
+[[dimensions]]
+id       = "traffic"
+label    = "Traffic processed"
+unit     = "GB"
+quantity = "default(monthly_traffic_gb, 0)"
+rate     = 'price("traffic")'
+when     = "default(monthly_traffic_gb, 0) > 0"
+
+[fixture]
+attributes = { endpoint_count = 1, monthly_traffic_gb = 100 }
+expected_monthly_cost = 294.85
+tolerance = 0.05

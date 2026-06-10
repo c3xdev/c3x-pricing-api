@@ -1,0 +1,68 @@
+kind         = "aws_mwaa_environment"
+display_name = "AWS MWAA Environment"
+provider     = "aws"
+
+# Managed Workflows for Apache Airflow bills per-hour by environment
+# size for the base environment + per-hour worker / scheduler /
+# webserver fees when running. The upstream catalog stores these with
+# an empty productFamily but clean `type` + `size` attributes.
+#
+# We model the base environment + workers here; users can extend via
+# c3x-usage.yml to add extra schedulers / webservers if needed.
+
+[mappings.environment]
+service        = "AmazonMWAA"
+product_family = ""
+attribute_filters = [
+  { key = "type", const = "Environment" },
+  # Terraform's `environment_class` is "mw1.small" / "mw1.medium" / …;
+  # upstream stores the bare size ("Small", "Medium", "Large", …).
+  { key = "size", expr = '''
+      pick(default(environment_class, "mw1.small") == "mw1.micro",    "Micro",
+      pick(default(environment_class, "mw1.small") == "mw1.small",    "Small",
+      pick(default(environment_class, "mw1.small") == "mw1.medium",   "Medium",
+      pick(default(environment_class, "mw1.small") == "mw1.large",    "Large",
+      pick(default(environment_class, "mw1.small") == "mw1.xlarge",   "XLarge",
+      pick(default(environment_class, "mw1.small") == "mw1.2xlarge",  "2XLarge",
+      "Small"))))))
+  ''' },
+]
+
+[mappings.worker]
+service        = "AmazonMWAA"
+product_family = ""
+attribute_filters = [
+  { key = "type", const = "Worker" },
+  # Terraform's `environment_class` is "mw1.small" / "mw1.medium" / …;
+  # upstream stores the bare size ("Small", "Medium", "Large", …).
+  { key = "size", expr = '''
+      pick(default(environment_class, "mw1.small") == "mw1.micro",    "Micro",
+      pick(default(environment_class, "mw1.small") == "mw1.small",    "Small",
+      pick(default(environment_class, "mw1.small") == "mw1.medium",   "Medium",
+      pick(default(environment_class, "mw1.small") == "mw1.large",    "Large",
+      pick(default(environment_class, "mw1.small") == "mw1.xlarge",   "XLarge",
+      pick(default(environment_class, "mw1.small") == "mw1.2xlarge",  "2XLarge",
+      "Small"))))))
+  ''' },
+]
+
+[[dimensions]]
+id       = "environment_hours"
+label    = "Airflow environment"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("environment")'
+
+[[dimensions]]
+id       = "worker_hours"
+label    = "Additional workers"
+unit     = "worker-hours"
+when     = "default(max_workers, 1) > 1"
+quantity = "(default(max_workers, 1) - 1) * monthly_hours()"
+rate     = 'price("worker")'
+
+[fixture]
+attributes = { environment_class = "mw1.small", max_workers = 1 }
+expected_monthly_cost = 357.7
+tolerance = 0.05
+

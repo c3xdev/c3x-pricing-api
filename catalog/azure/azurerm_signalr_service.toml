@@ -1,0 +1,36 @@
+kind         = "azurerm_signalr_service"
+display_name = "Azure SignalR Service"
+provider     = "azure"
+
+# SignalR bills per unit-day by SKU; the upstream meter is "Unit"
+# priced daily. Standard $1.61/unit-day, Premium $2/unit-day.
+# Free tier = $0.
+
+[mappings.unit]
+service        = "SignalR"
+product_family = "Analytics"
+region         = "Global"
+attribute_filters = [
+  { key = "skuName", expr = '''
+      default(sku, "Standard_S1") == "Premium_P1" ? "Premium" :
+      default(sku, "Standard_S1") == "Free_F1"    ? "Free" :
+                                                    "Standard"
+  ''' },
+  { key = "meterName", expr = '''
+      default(sku, "Standard_S1") == "Premium_P1" ? "Premium Unit" :
+      default(sku, "Standard_S1") == "Free_F1"    ? "Standard Unit - Free" :
+                                                    "Standard Unit"
+  ''' },
+]
+
+[[dimensions]]
+id       = "unit_days"
+label    = "SignalR units"
+unit     = "unit-days"
+quantity = "default(capacity, 1) * 30.4"
+rate     = 'price("unit")'
+
+[fixture]
+attributes = { sku = "Standard_S1", capacity = 1 }
+expected_monthly_cost = 48.9
+tolerance = 0.10

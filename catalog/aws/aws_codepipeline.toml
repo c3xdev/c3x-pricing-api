@@ -1,0 +1,24 @@
+kind         = "aws_codepipeline"
+display_name = "AWS CodePipeline"
+provider     = "aws"
+
+# Active pipelines (any execution in the prior 30 days) bill $1/month.
+# Pipelines that haven't executed in 30 days are FREE. First pipeline
+# per account is FREE.
+#
+# STATIC: CodePipeline isn't exposed in the upstream catalogue
+# (probed 2026-06-09).
+
+[[dimensions]]
+id       = "active_pipeline"
+label    = "Active pipeline"
+unit     = "months"
+quantity = "1"
+rate     = "1.0"
+when     = "default(active, true) == true"
+
+[fixture]
+attributes = { active = true }
+expected_monthly_cost = 1
+exact = true
+last_verified = "2026-06-09"

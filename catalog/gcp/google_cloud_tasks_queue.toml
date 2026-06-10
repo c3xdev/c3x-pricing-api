@@ -1,0 +1,19 @@
+kind         = "google_cloud_tasks_queue"
+display_name = "GCP Cloud Tasks Queue"
+provider     = "gcp"
+
+# Cloud Tasks: $0.40 per million operations after the 1M/month free tier.
+
+[[dimensions]]
+id       = "operations"
+label    = "Queue operations"
+unit     = "1M operations"
+quantity = "default(monthly_operations, 0) / 1000000"
+rate     = "0.40"
+
+[fixture]
+attributes = { monthly_operations = 1_000_000 }
+expected_monthly_cost = 0.4
+exact = true
+last_verified = "2026-06-09"
+

@@ -1,0 +1,35 @@
+kind         = "aws_vpn_connection"
+display_name = "AWS Site-to-Site VPN Connection"
+provider     = "aws"
+
+# Site-to-site VPN bills per-connection-hour. The upstream catalog
+# stores VPN under AmazonVPC > Cloud Connectivity with usagetype
+# `VPN-Usage-Hours:ipsec.1` for standard, `VPN-large-Usage-Hours:...`
+# for accelerated.
+
+[mappings.standard]
+service        = "AmazonVPC"
+product_family = "Cloud Connectivity"
+attribute_filters = [
+  { key = "usagetype", const = "VPN-Usage-Hours:ipsec.1" },
+]
+
+[mappings.accelerated]
+service        = "AmazonVPC"
+product_family = "Cloud Connectivity"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-VPN-large-Usage-Hours:ipsec.1" },
+]
+
+[[dimensions]]
+id       = "connection_hours"
+label    = "VPN connection"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'default(enable_acceleration, false) ? price("accelerated") : price("standard")'
+
+[fixture]
+attributes = { enable_acceleration = false }
+expected_monthly_cost = 36.5
+tolerance = 0.05
+

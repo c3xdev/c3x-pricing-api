@@ -1,0 +1,27 @@
+kind         = "azurerm_virtual_network_gateway"
+display_name = "Azure VPN Gateway"
+provider     = "azure"
+
+# VPN Gateway SKUs (Basic, VpnGw1, VpnGw2, ..., VpnGw5) bill per
+# hour. Higher generations cost more.
+
+[mappings.gateway]
+service        = "VPN Gateway"
+product_family = "Networking"
+attribute_filters = [
+  { key = "skuName",     expr = 'default(sku, "Basic")' },
+  { key = "productName", const = "VPN Gateway" },
+]
+
+[[dimensions]]
+id       = "gateway_hours"
+label    = "VPN Gateway"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("gateway")'
+
+[fixture]
+attributes = { sku = "VpnGw1" }
+expected_monthly_cost = 138.7
+tolerance = 0.05
+

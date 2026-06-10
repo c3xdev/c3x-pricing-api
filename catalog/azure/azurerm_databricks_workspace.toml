@@ -1,0 +1,37 @@
+kind         = "azurerm_databricks_workspace"
+display_name = "Azure Databricks Workspace"
+provider     = "azure"
+
+# Databricks bills DBU-hours. Common SKUs:
+#   - Premium All-Purpose Compute              ~$0.55/DBU-hour
+#   - Premium SQL Compute                      ~$0.55/DBU-hour
+#   - Premium Automated Serverless Compute     ~$0.45/DBU-hour
+#   - Premium Jobs Compute                     ~$0.30/DBU-hour
+#   - Standard variants are ~30% cheaper
+#
+# Underlying VM cost bills separately via azurerm_linux_virtual_machine.
+# This kind charges the DBU layer.
+
+[mappings.dbu]
+service        = "Azure Databricks"
+product_family = "Analytics"
+attribute_filters = [
+  { key = "productName", const = "Azure Databricks Regional" },
+  { key = "skuName", expr = '''
+      default(sku, "premium") == "standard" ? "Standard All-Purpose Compute" :
+                                              "Premium SQL Compute Pro"
+  ''' },
+]
+
+[[dimensions]]
+id       = "dbu_hours"
+label    = "Databricks Units"
+unit     = "DBU-hours"
+quantity = "default(monthly_dbu_hours, 0)"
+rate     = 'price("dbu")'
+when     = "default(monthly_dbu_hours, 0) > 0"
+
+[fixture]
+attributes = { sku = "premium", monthly_dbu_hours = 100 }
+expected_monthly_cost = 55
+tolerance = 0.05

@@ -1,0 +1,47 @@
+kind         = "aws_db_snapshot"
+display_name = "AWS RDS DB Snapshot"
+provider     = "aws"
+
+# RDS snapshots bill per-GB-month, with the rate keyed on the source
+# database engine. Single-AZ and Multi-AZ snapshots are billed
+# identically; we always query the Single-AZ SKU.
+#
+# Engines covered: postgres, mysql, mariadb, oracle (all editions),
+# sqlserver (all editions), aurora-postgresql, aurora-mysql, Db2.
+
+[mappings.snapshot]
+service        = "AmazonRDS"
+product_family = "Storage Snapshot"
+attribute_filters = [
+  { key = "databaseEngine", expr = '''
+      default(engine, "postgres") == "mysql"             ? "MySQL" :
+      default(engine, "postgres") == "mariadb"           ? "MariaDB" :
+      default(engine, "postgres") == "aurora-postgresql" ? "Aurora PostgreSQL" :
+      default(engine, "postgres") == "aurora-mysql"      ? "Aurora MySQL" :
+      default(engine, "postgres") == "oracle-ee"         ? "Oracle" :
+      default(engine, "postgres") == "oracle-se2"        ? "Oracle" :
+      default(engine, "postgres") == "oracle-se1"        ? "Oracle" :
+      default(engine, "postgres") == "oracle-se"         ? "Oracle" :
+      default(engine, "postgres") == "sqlserver-ee"      ? "SQL Server" :
+      default(engine, "postgres") == "sqlserver-se"      ? "SQL Server" :
+      default(engine, "postgres") == "sqlserver-ex"      ? "SQL Server" :
+      default(engine, "postgres") == "sqlserver-web"     ? "SQL Server" :
+      default(engine, "postgres") == "db2-ae"            ? "Db2" :
+      default(engine, "postgres") == "db2-se"            ? "Db2" :
+                                                           "PostgreSQL"
+  ''' },
+  { key = "deploymentOption", const = "Single-AZ" },
+]
+
+[[dimensions]]
+id       = "storage"
+label    = "Snapshot storage"
+unit     = "GB-month"
+quantity = "default(monthly_snapshot_gb, 0)"
+rate     = 'price("snapshot")'
+when     = "default(monthly_snapshot_gb, 0) > 0"
+
+[fixture]
+attributes = { engine = "postgres", monthly_snapshot_gb = 50 }
+expected_monthly_cost = 4.75
+tolerance = 0.05

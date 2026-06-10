@@ -1,0 +1,32 @@
+kind         = "aws_cognito_user_pool"
+display_name = "AWS Cognito User Pool"
+provider     = "aws"
+
+# Cognito Essentials tier (the default for new user pools):
+# $0.015/MAU above the 10,000 free monthly active users.
+# Legacy Lite-tier pools ($0.0055 tier-1) are grandfathered; model
+# the current tier since new Terraform resources create Essentials.
+
+[mappings.mau]
+service        = "AmazonCognito"
+product_family = "Amazon Cognito - Essentials"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-CognitoEssentialsMAU" },
+]
+
+[[dimensions]]
+id       = "monthly_active_users"
+label    = "Monthly active users (above free 10k)"
+unit     = "MAUs"
+quantity = '''
+  default(monthly_active_users, 0) > 10000 ?
+    (default(monthly_active_users, 0) - 10000) : 0
+'''
+rate     = 'price("mau")'
+when     = "default(monthly_active_users, 0) > 10000"
+
+[fixture]
+# (100,000 − 10,000) × $0.015 = $1,350
+attributes = { monthly_active_users = 100_000 }
+expected_monthly_cost = 1350
+tolerance = 0.05

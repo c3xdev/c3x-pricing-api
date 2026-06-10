@@ -1,0 +1,101 @@
+kind         = "google_sql_database_instance"
+display_name = "GCP Cloud SQL Instance"
+provider     = "gcp"
+
+# Cost components:
+#   compute — db-custom-V-M tiers decompose into vCPU + RAM SKUs
+#             (Zonal or Regional by settings.availability_type);
+#             db-f1-micro keeps its dedicated SKU.
+#   storage — Zonal/Regional standard storage per GB-month
+#             (settings.disk_size, default 10 GB).
+#
+# Engine prefix maps database_version (POSTGRES_15 → PostgreSQL,
+# MYSQL_8_0 → MySQL, SQLSERVER → SQL Server).
+
+[mappings.vcpu]
+service        = "Cloud SQL"
+product_family = "ApplicationServices"
+attribute_filters = [
+  { key = "description", expr = '''
+      "Cloud SQL for " +
+      (default(database_version, "POSTGRES_15") startsWith "MYSQL" ? "MySQL" :
+       default(database_version, "POSTGRES_15") startsWith "SQLSERVER" ? "SQL Server" : "PostgreSQL") +
+      ": " +
+      (default(default(settings_availability_type, availability_type), "ZONAL") == "REGIONAL" ? "Regional" : "Zonal") +
+      " - vCPU in Americas"
+  ''' },
+]
+
+[mappings.ram]
+service        = "Cloud SQL"
+product_family = "ApplicationServices"
+attribute_filters = [
+  { key = "description", expr = '''
+      "Cloud SQL for " +
+      (default(database_version, "POSTGRES_15") startsWith "MYSQL" ? "MySQL" :
+       default(database_version, "POSTGRES_15") startsWith "SQLSERVER" ? "SQL Server" : "PostgreSQL") +
+      ": " +
+      (default(default(settings_availability_type, availability_type), "ZONAL") == "REGIONAL" ? "Regional" : "Zonal") +
+      " - RAM in Americas"
+  ''' },
+]
+
+[mappings.micro]
+service        = "Cloud SQL"
+product_family = "ApplicationServices"
+attribute_filters = [
+  { key = "description", const = "Cloud SQL for PostgreSQL: Zonal - Micro instance in Americas" },
+]
+
+[mappings.storage]
+service        = "Cloud SQL"
+product_family = "ApplicationServices"
+attribute_filters = [
+  { key = "description", expr = '''
+      "Cloud SQL for " +
+      (default(database_version, "POSTGRES_15") startsWith "MYSQL" ? "MySQL" :
+       default(database_version, "POSTGRES_15") startsWith "SQLSERVER" ? "SQL Server" : "PostgreSQL") +
+      ": " +
+      (default(default(settings_availability_type, availability_type), "ZONAL") == "REGIONAL" ? "Regional" : "Zonal") +
+      " - Standard storage in Americas"
+  ''' },
+]
+
+[[dimensions]]
+id       = "compute_micro"
+label    = "Database compute (f1-micro)"
+unit     = "hours"
+when     = 'default(default(settings_tier, tier), "db-f1-micro") == "db-f1-micro"'
+quantity = "monthly_hours()"
+rate     = 'price("micro")'
+
+[[dimensions]]
+id       = "vcpu"
+label    = "Database vCPU"
+unit     = "vCPU-hours"
+when     = 'default(default(settings_tier, tier), "db-f1-micro") startsWith "db-custom"'
+quantity = 'float(split(default(default(settings_tier, tier), "db-custom-2-7680"), "-")[2]) * monthly_hours()'
+rate     = 'price("vcpu")'
+
+[[dimensions]]
+id       = "ram"
+label    = "Database RAM"
+unit     = "GiB-hours"
+when     = 'default(default(settings_tier, tier), "db-f1-micro") startsWith "db-custom"'
+quantity = 'float(split(default(default(settings_tier, tier), "db-custom-2-7680"), "-")[3]) / 1024 * monthly_hours()'
+rate     = 'price("ram")'
+
+[[dimensions]]
+id       = "storage"
+label    = "Storage (SSD)"
+unit     = "GB-month"
+when     = "default(default(settings_disk_size, disk_size), 0) > 0"
+quantity = "default(default(settings_disk_size, disk_size), 10)"
+rate     = 'price("storage")'
+
+[fixture]
+# db-custom-2-7680 PostgreSQL zonal: 2 × 0.0413 × 730 + 7.5 × 0.007 × 730 + 100 GB × 0.17
+# = 60.30 + 38.33 + 17.00 = 115.63
+attributes = { tier = "db-custom-2-7680", database_version = "POSTGRES_15", disk_size = 100 }
+expected_monthly_cost = 115.63
+tolerance = 0.05

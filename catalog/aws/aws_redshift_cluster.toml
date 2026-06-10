@@ -1,0 +1,23 @@
+kind         = "aws_redshift_cluster"
+display_name = "AWS Redshift Cluster"
+provider     = "aws"
+
+[mappings.node]
+service        = "AmazonRedshift"
+product_family = "Compute Instance"
+attribute_filters = [
+  { key = "instanceType", expr = 'default(node_type, "dc2.large")' },
+]
+
+[[dimensions]]
+id       = "node_hours"
+label    = "Redshift nodes"
+unit     = "node-hours"
+quantity = "default(number_of_nodes, 1) * monthly_hours()"
+rate     = 'price("node")'
+
+[fixture]
+attributes = { node_type = "dc2.large", number_of_nodes = 2 }
+expected_monthly_cost = 365
+tolerance = 0.05
+

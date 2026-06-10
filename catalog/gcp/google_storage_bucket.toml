@@ -1,0 +1,23 @@
+kind         = "google_storage_bucket"
+display_name = "GCP Cloud Storage Bucket"
+provider     = "gcp"
+
+[mappings.bucket_standard]
+service        = "Cloud Storage"
+product_family = "Storage"
+attribute_filters = [
+  { key = "description", const = "Standard Storage US Regional" },
+]
+
+[[dimensions]]
+id       = "storage"
+label    = "Standard Storage (US Regional)"
+unit     = "GB-month"
+quantity = "default(monthly_storage_gb, 0)"
+rate     = 'price("bucket_standard")'
+
+[fixture]
+attributes = { monthly_storage_gb = 100, storage_class = "STANDARD" }
+expected_monthly_cost = 2
+tolerance = 0.05
+

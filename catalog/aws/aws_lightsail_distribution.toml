@@ -1,0 +1,25 @@
+kind         = "aws_lightsail_distribution"
+display_name = "AWS Lightsail Distribution"
+provider     = "aws"
+
+# STATIC: Lightsail Distribution bundles. Small ($2.50/mo), Medium
+# ($8.50/mo), Large ($18.50/mo). Upstream doesn't expose these
+# discrete bundles as attribute-addressable SKUs.
+
+[[dimensions]]
+id       = "distribution"
+label    = "CDN distribution"
+unit     = "months"
+quantity = "1"
+rate     = '''
+  default(bundle_id, "small_1_0") == "medium_1_0" ?  8.50 :
+  default(bundle_id, "small_1_0") == "large_1_0"  ? 18.50 :
+                                                     2.50
+'''
+
+[fixture]
+attributes = { bundle_id = "small_1_0" }
+expected_monthly_cost = 2.5
+exact = true
+last_verified = "2026-06-09"
+

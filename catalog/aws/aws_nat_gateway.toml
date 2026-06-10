@@ -1,0 +1,65 @@
+kind         = "aws_nat_gateway"
+display_name = "AWS NAT Gateway"
+provider     = "aws"
+
+# NAT Gateway billing is two layers:
+#   1. Per-gateway hourly fee (~$0.045/hr in most regions)
+#   2. Per-GB data-processed fee (~$0.045/GB)
+#
+# When the NAT-consolidation TreeRule proposes "drop this NAT and
+# route its traffic through another AZ's NAT," the data that *was*
+# being processed locally now crosses AZ boundaries. AWS charges
+# inter-AZ data transfer at $0.01/GB in each direction = $0.02/GB
+# round-trip. The `monthly_inter_az_gb` attribute models that
+# additional cost so the consolidation rule reports NET savings
+# (NAT removed − inter-AZ added) rather than gross.
+
+[mappings.gateway]
+service        = "AmazonEC2"
+product_family = "NAT Gateway"
+attribute_filters = [
+  { key = "group", const = "NGW:NatGateway" },
+]
+
+[mappings.data_processing]
+service        = "AmazonEC2"
+product_family = "NAT Gateway"
+attribute_filters = [
+  { key = "group", const = "NGW:DataProcessing" },
+]
+
+[[dimensions]]
+id       = "gateway_hours"
+label    = "Gateway"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("gateway")'
+
+[[dimensions]]
+id       = "data_processing"
+label    = "Data processed"
+unit     = "GB"
+quantity = "default(monthly_data_processed_gb, 0)"
+rate     = 'price("data_processing")'
+
+# Cross-AZ data transfer at $0.01/GB per direction. The NAT
+# consolidation rule sets monthly_inter_az_gb to the volume that
+# *would* cross AZ boundaries after consolidating; default is 0 so
+# the dimension contributes nothing for normal estimates.
+[[dimensions]]
+id       = "inter_az_data"
+label    = "Cross-AZ data transfer (after consolidation)"
+unit     = "GB"
+quantity = "default(monthly_inter_az_gb, 0)"
+# $0.02/GB round-trip ($0.01 out from source AZ + $0.01 in at the
+# NAT's AZ). Inline rate because the upstream catalog's per-region
+# data-transfer entries are tier-keyed and not cleanly addressable
+# by attribute filters today.
+rate     = "0.02"
+when     = "default(monthly_inter_az_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_data_processed_gb = 100 }
+expected_monthly_cost = 785.48
+tolerance = 0.05
+

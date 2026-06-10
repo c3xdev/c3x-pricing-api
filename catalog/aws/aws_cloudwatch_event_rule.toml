@@ -1,0 +1,22 @@
+kind         = "aws_cloudwatch_event_rule"
+display_name = "AWS CloudWatch Events Rule (EventBridge)"
+provider     = "aws"
+
+# STATIC: EventBridge / CloudWatch Events bills $1.00/million
+# published events. AWS-service events are FREE. Cross-account
+# delivery is $2.00/M.
+
+[[dimensions]]
+id       = "events"
+label    = "Custom events"
+unit     = "events"
+quantity = "default(monthly_custom_events, 0)"
+rate     = "0.000001"
+when     = "default(monthly_custom_events, 0) > 0"
+
+[fixture]
+attributes = { monthly_custom_events = 1_000_000 }
+expected_monthly_cost = 1
+exact = true
+last_verified = "2026-06-09"
+

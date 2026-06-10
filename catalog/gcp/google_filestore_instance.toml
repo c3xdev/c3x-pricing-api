@@ -1,0 +1,26 @@
+kind         = "google_filestore_instance"
+display_name = "GCP Filestore Instance"
+provider     = "gcp"
+
+# Filestore Standard tier in us-central1: $0.20/GB-month.
+
+[mappings.capacity]
+service        = "Cloud Filestore"
+product_family = "Storage"
+attribute_filters = [
+  { key = "description", const = "Filestore Capacity Basic HDD (Standard) Iowa/South Carolina/Oregon" },
+]
+
+[[dimensions]]
+id       = "capacity"
+label    = "Filestore Standard capacity"
+unit     = "GB-month"
+quantity = "default(file_shares_capacity_gb, 1024)"
+rate     = 'price("capacity")'
+
+[fixture]
+attributes = { file_shares_capacity_gb = 1024, tier = "STANDARD" }
+expected_monthly_cost = 163.84
+exact = true
+last_verified = "2026-06-09"
+

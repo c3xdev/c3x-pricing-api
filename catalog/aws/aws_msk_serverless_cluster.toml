@@ -1,0 +1,87 @@
+kind         = "aws_msk_serverless_cluster"
+display_name = "AWS MSK Serverless Cluster"
+provider     = "aws"
+
+# MSK Serverless bills 4 meters:
+#   - Cluster hour       $0.75/hour per cluster
+#   - Partition hour     $0.0015/partition-hour
+#   - Storage hour       $0.10/GB-hour (≈ $0.10/GB-month / 730 * 730)
+#   - Data in / out      $0.10/GB-in, $0.05/GB-out
+
+[mappings.cluster]
+service        = "AmazonMSK"
+product_family = "Managed Streaming for Apache Kafka (MSK)"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-KafkaServerless-ClusterHours" },
+]
+
+[mappings.partition]
+service        = "AmazonMSK"
+product_family = "Managed Streaming for Apache Kafka (MSK)"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-KafkaServerless-PartitionHours" },
+]
+
+[mappings.storage]
+service        = "AmazonMSK"
+product_family = "Managed Streaming for Apache Kafka (MSK)"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-KafkaServerless-StorageHours" },
+]
+
+[mappings.data_in]
+service        = "AmazonMSK"
+product_family = "Managed Streaming for Apache Kafka (MSK)"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-KafkaServerless-In-Bytes" },
+]
+
+[mappings.data_out]
+service        = "AmazonMSK"
+product_family = "Managed Streaming for Apache Kafka (MSK)"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-KafkaServerless-Out-Bytes" },
+]
+
+[[dimensions]]
+id       = "cluster_hours"
+label    = "Cluster"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("cluster")'
+
+[[dimensions]]
+id       = "partition_hours"
+label    = "Partitions"
+unit     = "partition-hours"
+quantity = "default(partition_count, 1) * monthly_hours()"
+rate     = 'price("partition")'
+
+[[dimensions]]
+id       = "storage_gb_hours"
+label    = "Storage"
+unit     = "GB-hours"
+quantity = "default(monthly_storage_gb, 0) * monthly_hours()"
+rate     = 'price("storage")'
+when     = "default(monthly_storage_gb, 0) > 0"
+
+[[dimensions]]
+id       = "data_in"
+label    = "Data in"
+unit     = "GB"
+quantity = "default(monthly_data_in_gb, 0)"
+rate     = 'price("data_in")'
+when     = "default(monthly_data_in_gb, 0) > 0"
+
+[[dimensions]]
+id       = "data_out"
+label    = "Data out"
+unit     = "GB"
+quantity = "default(monthly_data_out_gb, 0)"
+rate     = 'price("data_out")'
+when     = "default(monthly_data_out_gb, 0) > 0"
+
+[fixture]
+attributes = { partition_count = 10, monthly_storage_gb = 0, monthly_data_in_gb = 0, monthly_data_out_gb = 0 }
+expected_monthly_cost = 558.45
+tolerance = 0.05

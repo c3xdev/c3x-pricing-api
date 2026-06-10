@@ -1,0 +1,101 @@
+kind         = "aws_lambda_function"
+display_name = "AWS Lambda Function"
+provider     = "aws"
+
+[mappings.requests]
+service        = "AWSLambda"
+product_family = "Serverless"
+attribute_filters = [
+  { key = "group", const = "AWS-Lambda-Requests" },
+]
+
+[mappings.duration_x86]
+service        = "AWSLambda"
+product_family = "Serverless"
+attribute_filters = [
+  { key = "group", const = "AWS-Lambda-Duration" },
+]
+
+[mappings.duration_arm]
+service        = "AWSLambda"
+product_family = "Serverless"
+attribute_filters = [
+  { key = "group", const = "AWS-Lambda-Duration-ARM" },
+]
+
+# Upstream returns price per single request and per single GB-second.
+# Quantity stays in the natural per-month unit; we don't pre-scale.
+[[dimensions]]
+id       = "requests"
+label    = "Requests"
+unit     = "requests"
+quantity = "default(monthly_requests, 0)"
+rate     = 'price("requests")'
+
+[[dimensions]]
+id       = "duration"
+label    = "Duration"
+unit     = "GB-seconds"
+quantity = '''
+  default(monthly_requests, 0)
+  * (default(request_duration_ms, 100) / 1000)
+  * (default(memory_size, 128) / 1024)
+'''
+rate     = 'pick(default(architectures, "x86_64") == "arm64", price("duration_arm"), price("duration_x86"))'
+
+[mappings.provisioned_concurrency]
+service        = "AWSLambda"
+attribute_filters = [
+  { key = "usagetype", expr = """
+      default(architectures, "x86_64") == "arm64" ?
+        "Lambda-Provisioned-Concurrency-ARM" : "Lambda-Provisioned-Concurrency"
+  """ },
+]
+
+[mappings.provisioned_duration]
+service        = "AWSLambda"
+attribute_filters = [
+  { key = "usagetype", expr = """
+      default(architectures, "x86_64") == "arm64" ?
+        "Lambda-Provisioned-GB-Second-ARM" : "Lambda-Provisioned-GB-Second"
+  """ },
+]
+
+[mappings.ephemeral_storage]
+service        = "AWSLambda"
+attribute_filters = [
+  { key = "usagetype", const = "Lambda-Storage-GB-Second" },
+]
+
+[[dimensions]]
+id       = "provisioned_concurrency"
+label    = "Provisioned concurrency"
+unit     = "GB-seconds"
+when     = "default(provisioned_concurrency_gb, 0) > 0"
+quantity = "default(provisioned_concurrency_gb, 0) * monthly_hours() * 3600"
+rate     = 'price("provisioned_concurrency")'
+
+[[dimensions]]
+id       = "provisioned_duration"
+label    = "Duration on provisioned concurrency"
+unit     = "GB-seconds"
+when     = "default(monthly_provisioned_gb_seconds, 0) > 0"
+quantity = "default(monthly_provisioned_gb_seconds, 0)"
+rate     = 'price("provisioned_duration")'
+
+[[dimensions]]
+id       = "ephemeral_storage"
+label    = "Ephemeral storage above 512 MB"
+unit     = "GB-seconds"
+when     = "default(ephemeral_storage_size, 512) > 512 && default(monthly_requests, 0) > 0"
+quantity = """
+  (default(ephemeral_storage_size, 512) - 512) / 1024 *
+  default(monthly_requests, 0) * default(request_duration_ms, 100) / 1000
+"""
+rate     = 'price("ephemeral_storage")'
+
+[fixture]
+attributes = { memory_size = 512, monthly_requests = 1_000_000, request_duration_ms = 200 }
+expected_monthly_cost = 1.87
+tolerance = 0.05
+

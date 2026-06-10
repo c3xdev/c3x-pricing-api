@@ -1,0 +1,21 @@
+kind         = "aws_sagemaker_endpoint"
+display_name = "AWS SageMaker Endpoint"
+provider     = "aws"
+
+# SageMaker isn't broken out in the upstream catalogue. Fall back to the
+# published ml.t2.medium hourly rate ($0.065/hr) until the API exposes the
+# service; users with non-default instances should override via overrides.
+
+[[dimensions]]
+id       = "endpoint_hours"
+label    = "Endpoint instance hours (ml.t2.medium)"
+unit     = "instance-hours"
+quantity = "default(production_variants_initial_instance_count, 1) * monthly_hours()"
+rate     = "0.065"
+
+[fixture]
+attributes = { production_variants_initial_instance_count = 1, production_variants_instance_type = "ml.t2.medium" }
+expected_monthly_cost = 47.45
+exact = true
+last_verified = "2026-06-09"
+

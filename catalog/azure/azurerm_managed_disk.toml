@@ -1,0 +1,31 @@
+kind         = "azurerm_managed_disk"
+display_name = "Azure Managed Disk"
+provider     = "azure"
+
+# Azure managed disks are priced per-tier as flat monthly fees, where the
+# tier is determined by disk size (E1 = 4 GB, E10 = 128 GB, E20 = 512 GB,
+# etc.). The catalog returns one entry per tier. We default to E10 LRS
+# (128 GB Standard SSD) since 128 GB is the most common default; this is
+# documented as approximate. For exact pricing, the engine would need a
+# size-to-tier lookup table.
+
+[mappings.disk_e10]
+service        = "Storage"
+product_family = "Storage"
+attribute_filters = [
+  { key = "meterName",   const = "E10 LRS Disk" },
+  { key = "productName", const = "Standard SSD Managed Disks" },
+]
+
+[[dimensions]]
+id       = "disk"
+label    = "Managed disk (E10 LRS, approximate)"
+unit     = "disk-month"
+quantity = "1"
+rate     = 'price("disk_e10")'
+
+[fixture]
+attributes = { disk_size_gb = 128, storage_account_type = "Standard_LRS" }
+expected_monthly_cost = 9.6
+tolerance = 0.05
+

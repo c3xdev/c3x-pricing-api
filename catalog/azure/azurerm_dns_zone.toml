@@ -1,0 +1,31 @@
+kind         = "azurerm_dns_zone"
+display_name = "Azure DNS Zone"
+provider     = "azure"
+
+# STATIC: Azure DNS isn't exposed under any direct service name in
+# the upstream catalog (probed 2026-06-08). Published rates:
+#   - First 25 zones: $0.50/zone/month
+#   - Beyond 25:      $0.10/zone/month
+#   - DNS queries:    $0.40 per million queries
+
+[[dimensions]]
+id       = "zone"
+label    = "Hosted zone"
+unit     = "months"
+quantity = "1"
+rate     = "0.50"
+
+[[dimensions]]
+id       = "queries"
+label    = "DNS queries"
+unit     = "1M-queries"
+quantity = "default(monthly_queries, 0) / 1000000"
+rate     = "0.40"
+when     = "default(monthly_queries, 0) > 0"
+
+[fixture]
+attributes = { monthly_queries = 1_000_000 }
+expected_monthly_cost = 0.9
+exact = true
+last_verified = "2026-06-09"
+

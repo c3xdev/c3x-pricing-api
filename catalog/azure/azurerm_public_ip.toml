@@ -1,0 +1,33 @@
+kind         = "azurerm_public_ip"
+display_name = "Azure Public IP Address"
+provider     = "azure"
+
+# Azure Public IP pricing depends on sku + allocation_method:
+#   - Basic SKU + Dynamic:  FREE
+#   - Basic SKU + Static:   ~$0.0036/hr (~$2.63/mo)
+#   - Standard SKU:         ~$0.005/hr  (~$3.65/mo) regardless of allocation
+#
+# STATIC: the Public IP meter isn't exposed in the upstream catalogue
+# under any direct service name (probed 2026-06-09). Rates are taken
+# from the published Azure pricing page and apply to East US.
+
+[[dimensions]]
+id       = "ip_hours"
+label    = "Public IP address"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = '''
+  default(sku, "Basic") == "Standard" ? 0.005 :
+  default(allocation_method, "Dynamic") == "Static" ? 0.0036 :
+                                                     0
+'''
+when     = '''
+  default(sku, "Basic") == "Standard" ||
+  default(allocation_method, "Dynamic") == "Static"
+'''
+
+[fixture]
+attributes = { sku = "Standard", allocation_method = "Static" }
+expected_monthly_cost = 3.65
+exact = true
+last_verified = "2026-06-09"

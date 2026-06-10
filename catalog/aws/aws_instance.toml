@@ -1,0 +1,104 @@
+kind         = "aws_instance"
+display_name = "AWS EC2 Instance"
+provider     = "aws"
+
+# Cost components:
+#   compute        — on-demand instance hours (OS-aware)
+#   root_volume    — root_block_device storage (default 8 GB gp3
+#                    when the block is present without a size)
+#   ebs_volumes    — additional ebs_block_device storage, summed
+#                    across repeated blocks
+#   monitoring     — detailed (1-min) CloudWatch monitoring:
+#                    7 metrics per instance
+#   cpu_credits    — t2/t3/t3a/t4g unlimited-mode surcharge per
+#                    vCPU-hour of bursting (usage attribute
+#                    monthly_cpu_credit_hrs × vcpu_count)
+
+[mappings.compute]
+service        = "AmazonEC2"
+product_family = "Compute Instance"
+attribute_filters = [
+  { key = "instanceType",    expr  = 'default(instance_type, "t3.micro")' },
+  { key = "operatingSystem", expr  = 'default(operating_system, "Linux")' },
+  { key = "preInstalledSw",  const = "NA" },
+  { key = "tenancy",         expr  = 'default(tenancy, "default") == "dedicated" ? "Dedicated" : "Shared"' },
+  { key = "capacitystatus",  const = "Used" },
+]
+
+[mappings.root_storage]
+service        = "AmazonEC2"
+product_family = "Storage"
+attribute_filters = [
+  { key = "volumeApiName", expr = 'default(root_block_device_volume_type, "gp3")' },
+]
+
+[mappings.ebs_storage]
+service        = "AmazonEC2"
+product_family = "Storage"
+attribute_filters = [
+  # Repeated blocks may mix types; price at the first block's type
+  # (flattened alias) — gp3/gp2 dominate and share the $0.08/0.10 split.
+  { key = "volumeApiName", expr = 'default(ebs_block_device_volume_type, "gp3")' },
+]
+
+[mappings.monitoring]
+service        = "AmazonCloudWatch"
+attribute_filters = [
+  { key = "usagetype", const = "CW:MetricMonitorUsage" },
+]
+
+[mappings.cpu_credits]
+service        = "AmazonEC2"
+product_family = "CPU Credits"
+attribute_filters = [
+  { key = "usagetype", expr = '"CPUCredits:" + split(default(instance_type, "t3.micro"), ".")[0]' },
+  { key = "operation", expr = '''
+      default(operating_system, "Linux") == "Windows" ?
+        "Windows" + upper(split(default(instance_type, "t3.micro"), ".")[0]) + "CPUCredits" :
+        upper(split(default(instance_type, "t3.micro"), ".")[0]) + "CPUCredits"
+  ''' },
+]
+
+[[dimensions]]
+id       = "compute_hours"
+label    = "Instance usage (Linux/UNIX, on-demand)"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("compute")'
+
+[[dimensions]]
+id       = "root_volume"
+label    = "Root EBS volume"
+unit     = "GB-month"
+when     = "default(root_block_device_volume_size, 0) > 0"
+quantity = "default(root_block_device_volume_size, 8)"
+rate     = 'price("root_storage")'
+
+[[dimensions]]
+id       = "ebs_volumes"
+label    = "Additional EBS volumes"
+unit     = "GB-month"
+when     = 'sum_field(ebs_block_device, "volume_size") > 0'
+quantity = 'sum_field(ebs_block_device, "volume_size")'
+rate     = 'price("ebs_storage")'
+
+[[dimensions]]
+id       = "monitoring"
+label    = "Detailed CloudWatch monitoring (7 metrics)"
+unit     = "metric-months"
+when     = "default(monitoring, false) == true"
+quantity = "7"
+rate     = 'price("monitoring")'
+
+[[dimensions]]
+id       = "cpu_credits"
+label    = "CPU credits (unlimited mode)"
+unit     = "vCPU-hours"
+when     = "default(monthly_cpu_credit_hrs, 0) > 0"
+quantity = "default(monthly_cpu_credit_hrs, 0) * default(vcpu_count, 2)"
+rate     = 'price("cpu_credits")'
+
+[fixture]
+attributes = { instance_type = "m5.xlarge" }
+expected_monthly_cost = 140.16
+tolerance = 0.05

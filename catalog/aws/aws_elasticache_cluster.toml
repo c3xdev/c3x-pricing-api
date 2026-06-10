@@ -1,0 +1,45 @@
+kind         = "aws_elasticache_cluster"
+display_name = "AWS ElastiCache Cluster"
+provider     = "aws"
+
+[mappings.node]
+service        = "AmazonElastiCache"
+product_family = "Cache Instance"
+attribute_filters = [
+  # Pin the plain on-demand SKU: the same instanceType also matches
+  # "USE1-ExtendedSupportYr…-NodeUsage:…" surcharge rows, and the
+  # max-non-zero picker would quote the surcharge instead of the rate.
+  { key = "usagetype",    expr = '"NodeUsage:" + default(node_type, "cache.t3.micro")' },
+  { key = "cacheEngine",  expr = '''
+      pick(default(engine, "redis") == "redis", "Redis",
+      pick(default(engine, "redis") == "memcached", "Memcached",
+      pick(default(engine, "redis") == "valkey", "Valkey", "Redis")))
+  ''' },
+]
+
+[[dimensions]]
+id       = "node_hours"
+label    = "Cache nodes"
+unit     = "node-hours"
+quantity = "default(num_cache_nodes, 1) * monthly_hours()"
+rate     = 'price("node")'
+
+[mappings.backup]
+service        = "AmazonElastiCache"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-BackupUsage:Redis" },
+]
+
+[[dimensions]]
+id       = "backup_storage"
+label    = "Backup storage (beyond one free snapshot)"
+unit     = "GB-month"
+when     = "default(snapshot_retention_limit, 0) > 1 && default(monthly_backup_storage_gb, 0) > 0"
+quantity = "default(monthly_backup_storage_gb, 0)"
+rate     = 'price("backup")'
+
+[fixture]
+attributes = { engine = "redis", node_type = "cache.t3.micro", num_cache_nodes = 1 }
+expected_monthly_cost = 12.41
+tolerance = 0.05
+

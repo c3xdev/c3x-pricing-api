@@ -1,0 +1,40 @@
+kind         = "aws_directory_service_directory"
+display_name = "AWS Directory Service"
+provider     = "aws"
+
+# Managed Microsoft AD / Simple AD / AD Connector bill hourly by
+# edition+size. usagetype shapes:
+#   Std-MicrosoftAD-DC-Usage   $0.06/hr per domain controller
+#   Small-Directory-Usage      $0.05/hr (Simple AD small)
+#   Large-ADConnector-Usage    $0.15/hr
+
+[mappings.microsoft_ad]
+service        = "AWSDirectoryService"
+product_family = "AWS Directory Service"
+attribute_filters = [
+  { key = "usagetype", const = "Std-MicrosoftAD-DC-Usage" },
+]
+
+[mappings.simple_ad]
+service        = "AWSDirectoryService"
+product_family = "AWS Directory Service"
+attribute_filters = [
+  { key = "usagetype", const = "Small-Directory-Usage" },
+]
+
+[[dimensions]]
+id       = "directory_hours"
+label    = "Directory"
+unit     = "hours"
+quantity = '''
+  (default(type, "MicrosoftAD") == "MicrosoftAD" ? 2 : 1) * monthly_hours()
+'''
+rate     = '''
+  default(type, "MicrosoftAD") == "SimpleAD" ? price("simple_ad") : price("microsoft_ad")
+'''
+
+[fixture]
+# MicrosoftAD Standard: 2 DCs × 730 × $0.06 = $87.60
+attributes = { type = "MicrosoftAD" }
+expected_monthly_cost = 87.6
+tolerance = 0.05

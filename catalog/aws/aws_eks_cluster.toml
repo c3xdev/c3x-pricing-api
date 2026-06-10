@@ -1,0 +1,25 @@
+kind         = "aws_eks_cluster"
+display_name = "AWS EKS Cluster"
+provider     = "aws"
+
+# Classic EKS control plane: $0.10/hr per cluster. The scraper's
+# EKS-mode normaliser distinguishes Classic from AutoMode SKUs.
+
+[mappings.control_plane]
+service        = "AmazonEKS"
+product_family = "Compute"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-AmazonEKS-Hours:perCluster" },
+]
+
+[[dimensions]]
+id       = "control_plane"
+label    = "Control plane (EKS classic)"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("control_plane")'
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 73
+tolerance = 0.05

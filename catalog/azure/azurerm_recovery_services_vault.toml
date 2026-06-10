@@ -1,0 +1,20 @@
+kind         = "azurerm_recovery_services_vault"
+display_name = "Azure Recovery Services Vault"
+provider     = "azure"
+
+# STATIC: Recovery Services Vault itself is free; backup protection
+# is billed per-protected-instance + storage. Modelled as a soft
+# placeholder — actual cost lives on the protected resources.
+
+[[dimensions]]
+id       = "vault"
+label    = "Recovery vault"
+unit     = "n/a"
+quantity = "0"
+rate     = "0"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 0
+exact = true
+

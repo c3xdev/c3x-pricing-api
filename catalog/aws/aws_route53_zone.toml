@@ -1,0 +1,33 @@
+kind         = "aws_route53_zone"
+display_name = "AWS Route53 Hosted Zone"
+provider     = "aws"
+
+[mappings.hosted_zone]
+service        = "AmazonRoute53"
+product_family = "DNS Zone"
+attribute_filters = []
+
+[mappings.queries]
+service        = "AmazonRoute53"
+product_family = "DNS Query"
+attribute_filters = []
+
+[[dimensions]]
+id       = "hosted_zone"
+label    = "Hosted zone"
+unit     = "zones"
+quantity = "1"
+rate     = 'price("hosted_zone")'
+
+[[dimensions]]
+id       = "queries"
+label    = "DNS queries"
+unit     = "queries"
+quantity = "default(monthly_queries, 0)"
+rate     = 'price("queries")'
+
+[fixture]
+attributes = { monthly_queries = 1_000_000 }
+expected_monthly_cost = 750000
+tolerance = 0.05
+

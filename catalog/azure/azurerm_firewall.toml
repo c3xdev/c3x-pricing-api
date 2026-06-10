@@ -1,0 +1,37 @@
+kind         = "azurerm_firewall"
+display_name = "Azure Firewall"
+provider     = "azure"
+
+# Azure Firewall has both a per-deployment hourly fee (~$1.25/hr for
+# Standard) and per-GB data-processed fee ($0.016/GB Standard). The
+# hourly deployment fee meter isn't reliably exposed; fall back to the
+# published rate for the deployment line item and use the live API for
+# data processed.
+
+[mappings.data_processed_standard]
+service        = "Azure Firewall"
+product_family = "Networking"
+attribute_filters = [
+  { key = "meterName", const = "Standard Data Processed" },
+]
+
+[[dimensions]]
+id       = "deployment_hours"
+label    = "Standard deployment"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = "1.25"
+
+[[dimensions]]
+id       = "data_processed"
+label    = "Data processed"
+unit     = "GB"
+quantity = "default(monthly_data_processed_gb, 0)"
+rate     = 'price("data_processed_standard")'
+
+[fixture]
+attributes = { monthly_data_processed_gb = 100, sku_tier = "Standard" }
+expected_monthly_cost = 912.5
+exact = true
+last_verified = "2026-06-09"
+

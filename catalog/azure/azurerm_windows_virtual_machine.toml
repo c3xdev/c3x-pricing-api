@@ -1,0 +1,72 @@
+kind         = "azurerm_windows_virtual_machine"
+display_name = "Azure Windows Virtual Machine"
+provider     = "azure"
+
+# Azure's catalogue surfaces Linux and Windows variants of the same SKU
+# under different `productName` values (e.g. "Virtual Machines Dsv5 Series"
+# vs "Virtual Machines Dsv5 Series Windows"). The skuName attribute alone
+# is identical between the two, so without a productName filter we'd pick
+# whichever the upstream returns first — historically Linux, producing a
+# silently-wrong Windows estimate.
+#
+# Today's compromise: hard-code productName for the Dsv5 family because
+# that's the default the test fixture uses and the most common general-
+# purpose SKU. Other families (Ev5, NCv3, M-series, …) currently fall
+# back to the Linux-first match. Tracked in CATALOG_STATUS.md as the
+# "Windows OS dispatch" item; a richer pick()-driven mapping or a
+# client-side productName regex (when the upstream gains regex support)
+# is the long-term fix.
+
+[mappings.compute_dsv5]
+service        = "Virtual Machines"
+product_family = "Compute"
+attribute_filters = [
+  { key = "skuName",     expr  = 'default(size, "Standard_D2s_v5")' },
+  { key = "productName", const = "Virtual Machines Dsv5 Series Windows" },
+]
+
+[[dimensions]]
+id       = "compute_hours"
+label    = "Virtual machine (Windows, Dsv5)"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("compute_dsv5")'
+
+[mappings.os_disk]
+service        = "Storage"
+product_family = "Storage"
+attribute_filters = [
+  # Managed disks bill per tier; map disk_size_gb to the smallest
+  # tier that fits (P/E/S × 4..50), mirroring Azure's tier ladder.
+  { key = "meterName", expr = """
+      (default(os_disk_storage_account_type, "Premium_LRS") == "Premium_LRS" ? "P" :
+       default(os_disk_storage_account_type, "Premium_LRS") == "StandardSSD_LRS" ? "E" : "S") +
+      (default(os_disk_disk_size_gb, 128) <= 32 ? "4" :
+       default(os_disk_disk_size_gb, 128) <= 64 ? "6" :
+       default(os_disk_disk_size_gb, 128) <= 128 ? "10" :
+       default(os_disk_disk_size_gb, 128) <= 256 ? "15" :
+       default(os_disk_disk_size_gb, 128) <= 512 ? "20" :
+       default(os_disk_disk_size_gb, 128) <= 1024 ? "30" :
+       default(os_disk_disk_size_gb, 128) <= 2048 ? "40" : "50") +
+      " LRS Disk"
+  """ },
+  { key = "productName", expr = """
+      default(os_disk_storage_account_type, "Premium_LRS") == "Premium_LRS" ? "Premium SSD Managed Disks" :
+      default(os_disk_storage_account_type, "Premium_LRS") == "StandardSSD_LRS" ? "Standard SSD Managed Disks" :
+                                                                                  "Standard HDD Managed Disks"
+  """ },
+]
+
+[[dimensions]]
+id       = "os_disk"
+label    = "OS disk (managed)"
+unit     = "disk-months"
+when     = "default(os_disk_disk_size_gb, 0) > 0"
+quantity = "1"
+rate     = 'price("os_disk")'
+
+[fixture]
+attributes = { size = "Standard_D2s_v5" }
+expected_monthly_cost = 137.24
+tolerance = 0.05
+

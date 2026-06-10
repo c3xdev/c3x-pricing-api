@@ -1,0 +1,25 @@
+kind         = "aws_kinesisanalyticsv2_application"
+display_name = "AWS Managed Flink Application"
+provider     = "aws"
+
+# Managed Service for Apache Flink bills per KPU-hour plus running
+# application storage (50 GB per KPU included).
+
+[mappings.kpu]
+service        = "AmazonKinesisAnalytics"
+product_family = "Kinesis Analytics"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-KPU-Hour-Java" },
+]
+
+[[dimensions]]
+id       = "kpu_hours"
+label    = "Kinesis Processing Units"
+unit     = "KPU-hours"
+quantity = "default(parallelism, 1) * monthly_hours()"
+rate     = 'price("kpu")'
+
+[fixture]
+attributes = { parallelism = 2 }
+expected_monthly_cost = 160.6
+tolerance = 0.05

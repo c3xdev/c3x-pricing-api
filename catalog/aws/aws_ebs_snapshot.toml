@@ -1,0 +1,35 @@
+kind         = "aws_ebs_snapshot"
+display_name = "AWS EBS Snapshot"
+provider     = "aws"
+
+# EBS Snapshots bill per-GB-month. Two tiers:
+#   - Standard:  $0.05/GB-month (USE1; same across most regions)
+#   - Archive:   $0.0125/GB-month (cheaper but slow restore)
+
+[mappings.standard]
+service        = "AmazonEC2"
+product_family = "Storage Snapshot"
+attribute_filters = [
+  { key = "usagetype", const = "EBS:SnapshotUsage" },
+]
+
+[mappings.archive]
+service        = "AmazonEC2"
+product_family = "Storage Snapshot"
+attribute_filters = [
+  { key = "usagetype", const = "EBS:SnapshotArchiveStorage" },
+]
+
+[[dimensions]]
+id       = "storage"
+label    = "Snapshot storage"
+unit     = "GB-month"
+quantity = "default(monthly_snapshot_gb, 0)"
+rate     = 'default(storage_tier, "standard") == "archive" ? price("archive") : price("standard")'
+when     = "default(monthly_snapshot_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_snapshot_gb = 100, storage_tier = "standard" }
+expected_monthly_cost = 5
+tolerance = 0.05
+

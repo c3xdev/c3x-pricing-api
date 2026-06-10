@@ -1,0 +1,35 @@
+kind         = "azurerm_api_management"
+display_name = "Azure API Management"
+provider     = "azure"
+
+# API Management bills per-instance-unit-hour by tier (Developer,
+# Basic, Standard, Premium). Consumption tier is free-tier +
+# per-call charges (not modelled here).
+
+[mappings.tier]
+service        = "API Management"
+product_family = "Developer Tools"
+attribute_filters = [
+  # Strip the Terraform `_<units>` suffix (e.g. "Standard_2" → "Standard").
+  { key = "skuName", expr = '''
+      default(sku_name, "Developer_1") == "Developer_1" ? "Developer" :
+      default(sku_name, "Developer_1") == "Basic_1"     ? "Basic v2" :
+      default(sku_name, "Developer_1") == "Standard_1"  ? "Standard" :
+      default(sku_name, "Developer_1") == "Premium_1"   ? "Premium" :
+                                                          "Standard"
+  ''' },
+  { key = "productName", const = "API Management" },
+]
+
+[[dimensions]]
+id       = "instance_hours"
+label    = "APIM instance"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("tier")'
+
+[fixture]
+attributes = { sku_name = "Standard_1" }
+expected_monthly_cost = 100
+tolerance = 0.05
+

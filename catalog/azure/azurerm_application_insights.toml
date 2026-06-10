@@ -1,0 +1,28 @@
+kind         = "azurerm_application_insights"
+display_name = "Azure Application Insights"
+provider     = "azure"
+
+# App Insights data lands in a Log Analytics workspace and bills at
+# the same ingestion rate (~$2.30/GB after 5 GB/mo free). If the
+# resource is associated with a workspace, costs accrue there; this
+# TOML models the *direct* ingestion path used by classic AI.
+#
+# STATIC: the classic Application Insights ingestion meter isn't
+# cleanly addressable in the upstream catalogue (probed 2026-06-09).
+
+[[dimensions]]
+id       = "ingestion"
+label    = "Telemetry ingestion (above free 5 GB)"
+unit     = "GB"
+quantity = '''
+  default(monthly_ingestion_gb, 0) > 5 ?
+    (default(monthly_ingestion_gb, 0) - 5) : 0
+'''
+rate     = "2.30"
+when     = "default(monthly_ingestion_gb, 0) > 5"
+
+[fixture]
+attributes = { monthly_ingestion_gb = 50 }
+expected_monthly_cost = 103.5
+exact = true
+last_verified = "2026-06-09"

@@ -1,0 +1,36 @@
+kind         = "aws_lightsail_instance"
+display_name = "AWS Lightsail Instance"
+provider     = "aws"
+
+# Lightsail instances bill per-hour by bundle (RAM size). Terraform
+# uses Lightsail bundle_id strings like `nano_2_0` → 0.5GB.
+
+[mappings.bundle]
+service        = "AmazonLightsail"
+product_family = "Lightsail Instance"
+attribute_filters = [
+  { key = "usagetype", expr = '''
+      "USE1-BundleUsage:" +
+      (default(bundle_id, "small_2_0") == "nano_2_0"      ? "0.5GB" :
+       default(bundle_id, "small_2_0") == "micro_2_0"     ? "1GB" :
+       default(bundle_id, "small_2_0") == "small_2_0"     ? "2GB" :
+       default(bundle_id, "small_2_0") == "medium_2_0"    ? "4GB" :
+       default(bundle_id, "small_2_0") == "large_2_0"     ? "8GB" :
+       default(bundle_id, "small_2_0") == "xlarge_2_0"    ? "16GB" :
+       default(bundle_id, "small_2_0") == "2xlarge_2_0"   ? "32GB" :
+                                                            "2GB")
+  ''' },
+]
+
+[[dimensions]]
+id       = "instance_hours"
+label    = "Lightsail instance"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("bundle")'
+
+[fixture]
+attributes = { bundle_id = "small_2_0" }
+expected_monthly_cost = 11.77
+tolerance = 0.05
+

@@ -1,0 +1,95 @@
+kind         = "aws_ecs_service"
+display_name = "AWS ECS Service"
+provider     = "aws"
+
+# Billing depends on launch_type:
+#   - FARGATE:  vCPU-hours + GB-hours per task × desired_count.
+#               x86 and ARM (Graviton) have different rates; ARM is
+#               ~20% cheaper. Windows adds an OS licence fee (not
+#               modelled — assert os = "windows" via usage file if
+#               needed).
+#   - EC2:      free at the service level; the container instances
+#               bill via aws_instance.
+#
+# Task sizing comes from the referenced task definition, which the
+# parser doesn't join across resources yet — supply `fargate_vcpu`
+# and `fargate_memory_gb` (per task) via attributes or the usage
+# file. Defaults match Fargate's smallest shape (0.25 vCPU / 0.5 GB).
+
+[mappings.vcpu_x86]
+service        = "AmazonECS"
+product_family = "Compute"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-Fargate-vCPU-Hours:perCPU" },
+]
+
+[mappings.memory_x86]
+service        = "AmazonECS"
+product_family = "Compute"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-Fargate-GB-Hours" },
+]
+
+[mappings.vcpu_arm]
+service        = "AmazonECS"
+product_family = "Compute"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-Fargate-ARM-vCPU-Hours:perCPU" },
+]
+
+[mappings.memory_arm]
+service        = "AmazonECS"
+product_family = "Compute"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-Fargate-ARM-GB-Hours" },
+]
+
+[[dimensions]]
+id       = "fargate_vcpu"
+label    = "Fargate vCPU"
+unit     = "vCPU-hours"
+quantity = '''
+  default(desired_count, 1) * default(fargate_vcpu, 0.25) * monthly_hours()
+'''
+rate     = '''
+  default(cpu_architecture, "X86_64") == "ARM64" ? price("vcpu_arm") : price("vcpu_x86")
+'''
+when     = 'default(launch_type, "EC2") == "FARGATE"'
+
+[[dimensions]]
+id       = "fargate_memory"
+label    = "Fargate memory"
+unit     = "GB-hours"
+quantity = '''
+  default(desired_count, 1) * default(fargate_memory_gb, 0.5) * monthly_hours()
+'''
+rate     = '''
+  default(cpu_architecture, "X86_64") == "ARM64" ? price("memory_arm") : price("memory_x86")
+'''
+when     = 'default(launch_type, "EC2") == "FARGATE"'
+
+[mappings.ephemeral]
+service        = "AmazonECS"
+product_family = "Compute"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-Fargate-EphemeralStorage-GB-Hours" },
+]
+
+[[dimensions]]
+id       = "fargate_ephemeral"
+label    = "Fargate ephemeral storage above 20 GB"
+unit     = "GB-hours"
+when     = """
+  default(launch_type, "EC2") == "FARGATE" &&
+  default(fargate_ephemeral_storage_gb, 20) > 20
+"""
+quantity = """
+  default(desired_count, 1) * (default(fargate_ephemeral_storage_gb, 20) - 20) * monthly_hours()
+"""
+rate     = 'price("ephemeral")'
+
+[fixture]
+# 2 tasks × (1 vCPU × $0.04048 + 2 GB × $0.004445) × 730h = $72.08
+attributes = { launch_type = "FARGATE", desired_count = 2, fargate_vcpu = 1, fargate_memory_gb = 2 }
+expected_monthly_cost = 72.08
+tolerance = 0.05

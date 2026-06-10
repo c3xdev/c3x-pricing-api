@@ -1,0 +1,22 @@
+kind         = "aws_ec2_transit_gateway_vpc_attachment"
+display_name = "AWS Transit Gateway VPC Attachment"
+provider     = "aws"
+
+# STATIC: the per-attachment hourly fee is not exposed by attribute
+# under the upstream catalog (probed 2026-06-08). Published rate is
+# $0.05/hour/attachment (us-east-1).
+# Data-processing fees ride on the parent aws_transit_gateway resource.
+
+[[dimensions]]
+id       = "attachment_hours"
+label    = "TGW attachment"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = "0.05"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 36.5
+exact = true
+last_verified = "2026-06-09"
+

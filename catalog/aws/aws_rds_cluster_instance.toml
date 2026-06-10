@@ -1,0 +1,33 @@
+kind         = "aws_rds_cluster_instance"
+display_name = "AWS Aurora Cluster Instance"
+provider     = "aws"
+
+# Aurora cluster INSTANCES bill per-hour by instance class. The
+# storage + I/O is on the parent `aws_rds_cluster` resource — keeping
+# the two separate matches Terraform's resource shape and avoids
+# double-counting.
+
+[mappings.instance]
+service        = "AmazonRDS"
+product_family = "Database Instance"
+attribute_filters = [
+  { key = "instanceType",   expr = 'default(instance_class, "db.r6g.large")' },
+  { key = "databaseEngine", expr = '''
+      pick(default(engine, "aurora-postgresql") == "aurora-mysql", "Aurora MySQL",
+      "Aurora PostgreSQL")
+  ''' },
+  { key = "deploymentOption", const = "Single-AZ" },
+]
+
+[[dimensions]]
+id       = "instance_hours"
+label    = "Aurora instance"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("instance")'
+
+[fixture]
+attributes = { engine = "aurora-postgresql", instance_class = "db.r6g.large" }
+expected_monthly_cost = 246.74
+tolerance = 0.05
+

@@ -1,0 +1,36 @@
+kind         = "google_alloydb_cluster"
+display_name = "GCP AlloyDB Cluster"
+provider     = "gcp"
+
+# STATIC: AlloyDB is not yet exposed in the c3x-pricing-api backend
+# (probed 2026-06-09). Published rates (us-central1):
+#   - vCPU-hour (Standard):      $0.06584/vCPU-hour
+#   - Memory-hour:               $0.0114/GiB-hour
+#   - Storage (regional):        $0.234/GB-month
+#   - Backup storage:            $0.10/GB-month
+#
+# A cluster always has at least a primary instance; instance vCPU
+# and memory bill via google_alloydb_instance child resources. This
+# kind covers the cluster-level storage + backup meters.
+
+[[dimensions]]
+id       = "storage"
+label    = "Regional storage"
+unit     = "GB-month"
+quantity = "default(monthly_storage_gb, 0)"
+rate     = "0.234"
+when     = "default(monthly_storage_gb, 0) > 0"
+
+[[dimensions]]
+id       = "backup_storage"
+label    = "Backup storage"
+unit     = "GB-month"
+quantity = "default(monthly_backup_storage_gb, 0)"
+rate     = "0.10"
+when     = "default(monthly_backup_storage_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_storage_gb = 100, monthly_backup_storage_gb = 50 }
+expected_monthly_cost = 28.4
+exact = true
+last_verified = "2026-06-09"

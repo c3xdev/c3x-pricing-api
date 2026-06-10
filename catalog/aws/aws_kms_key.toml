@@ -1,0 +1,33 @@
+kind         = "aws_kms_key"
+display_name = "AWS KMS Key"
+provider     = "aws"
+
+[mappings.key]
+service        = "awskms"
+product_family = "Encryption Key"
+attribute_filters = [{ key = "usagetype", const = "KMS-Keys" }]
+
+[mappings.requests]
+service        = "awskms"
+product_family = "API Request"
+attribute_filters = []
+
+[[dimensions]]
+id       = "key_storage"
+label    = "Customer master key"
+unit     = "keys"
+quantity = "1"
+rate     = 'price("key")'
+
+[[dimensions]]
+id       = "requests"
+label    = "Cryptographic requests"
+unit     = "requests"
+quantity = "default(monthly_requests, 0)"
+rate     = 'price("requests")'
+
+[fixture]
+attributes = { monthly_requests = 1_000_000 }
+expected_monthly_cost = 3
+tolerance = 0.05
+

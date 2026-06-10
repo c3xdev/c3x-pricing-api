@@ -1,0 +1,38 @@
+kind         = "aws_opensearch_domain"
+display_name = "AWS OpenSearch Service Domain"
+provider     = "aws"
+
+[mappings.node]
+service        = "AmazonES"
+product_family = "Amazon OpenSearch Service Instance"
+attribute_filters = [
+  { key = "instanceType", expr = 'default(cluster_config_instance_type, "t3.small.search")' },
+]
+
+[mappings.storage]
+service        = "AmazonES"
+product_family = "Storage"
+attribute_filters = [
+  { key = "volumeType", expr = 'default(ebs_options_volume_type, "gp3")' },
+]
+
+[[dimensions]]
+id       = "node_hours"
+label    = "Search nodes"
+unit     = "node-hours"
+quantity = "default(cluster_config_instance_count, 1) * monthly_hours()"
+rate     = 'price("node")'
+
+[[dimensions]]
+id       = "storage"
+label    = "EBS storage"
+unit     = "GB-month"
+when     = "default(ebs_options_ebs_enabled, true)"
+quantity = "default(cluster_config_instance_count, 1) * default(ebs_options_volume_size, 10)"
+rate     = 'price("storage")'
+
+[fixture]
+attributes = { cluster_config_instance_count = 1, cluster_config_instance_type = "t3.small.search", ebs_options_ebs_enabled = true, ebs_options_volume_size = 10, ebs_options_volume_type = "gp3" }
+expected_monthly_cost = 26.28
+tolerance = 0.05
+

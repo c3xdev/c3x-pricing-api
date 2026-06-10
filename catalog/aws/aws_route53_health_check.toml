@@ -1,0 +1,27 @@
+kind         = "aws_route53_health_check"
+display_name = "AWS Route 53 Health Check"
+provider     = "aws"
+
+# STATIC: the upstream catalog under AmazonRoute53 exposes DNS Query
+# meters but not the per-health-check monthly fee (probed 2026-06-08).
+# Published rates:
+#   - Basic (AWS endpoint):           $0.50/month
+#   - Basic (non-AWS endpoint):       $0.75/month
+#   - With each additional feature:   +$1/month (Latency, HTTPS, ...)
+
+[[dimensions]]
+id       = "health_check"
+label    = "Health check"
+unit     = "checks"
+quantity = "1"
+# CALCULATED checks are free. We can't easily distinguish AWS vs
+# non-AWS endpoints from the resource attributes, so default to the
+# non-AWS rate ($0.75) — the conservative estimate.
+rate     = 'default(type, "HTTP") == "CALCULATED" ? 0 : 0.75'
+
+[fixture]
+attributes = { fqdn = "example.com", type = "HTTPS" }
+expected_monthly_cost = 0.75
+exact = true
+last_verified = "2026-06-09"
+

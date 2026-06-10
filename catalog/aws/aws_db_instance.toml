@@ -1,0 +1,111 @@
+kind         = "aws_db_instance"
+display_name = "AWS RDS Instance"
+provider     = "aws"
+
+# Two engine-name shapes are stored as constants so the mapping below can
+# branch by interpreting `multi_az` inline. The expressions are evaluated
+# against the parsed resource attributes.
+
+[mappings.instance_single_az]
+service        = "AmazonRDS"
+product_family = "Database Instance"
+attribute_filters = [
+  { key = "instanceType",     expr = 'default(instance_class, "db.t3.micro")' },
+  { key = "databaseEngine",   expr = '''
+      pick(default(engine, "postgres") == "postgres", "PostgreSQL",
+      pick(default(engine, "postgres") == "mysql", "MySQL",
+      pick(default(engine, "postgres") == "mariadb", "MariaDB",
+      pick(default(engine, "postgres") == "aurora-postgresql", "Aurora PostgreSQL",
+      pick(default(engine, "postgres") == "aurora-mysql", "Aurora MySQL",
+      "PostgreSQL")))))
+  ''' },
+  { key = "deploymentOption", const = "Single-AZ" },
+]
+
+[mappings.instance_multi_az]
+service        = "AmazonRDS"
+product_family = "Database Instance"
+attribute_filters = [
+  { key = "instanceType",     expr = 'default(instance_class, "db.t3.micro")' },
+  { key = "databaseEngine",   expr = '''
+      pick(default(engine, "postgres") == "postgres", "PostgreSQL",
+      pick(default(engine, "postgres") == "mysql", "MySQL",
+      pick(default(engine, "postgres") == "mariadb", "MariaDB",
+      pick(default(engine, "postgres") == "aurora-postgresql", "Aurora PostgreSQL",
+      pick(default(engine, "postgres") == "aurora-mysql", "Aurora MySQL",
+      "PostgreSQL")))))
+  ''' },
+  { key = "deploymentOption", const = "Multi-AZ" },
+]
+
+[mappings.storage]
+service        = "AmazonRDS"
+product_family = "Database Storage"
+attribute_filters = [
+  { key = "volumeType", expr = '''
+      pick(default(storage_type, "gp2") == "gp2",   "General Purpose",
+      pick(default(storage_type, "gp2") == "gp3",   "General Purpose-GP3",
+      pick(default(storage_type, "gp2") == "io1",   "Provisioned IOPS",
+      pick(default(storage_type, "gp2") == "io2",   "Provisioned IOPS-IO2",
+      "General Purpose"))))
+  ''' },
+]
+
+[mappings.backup]
+service        = "AmazonRDS"
+product_family = "Storage Snapshot"
+attribute_filters = []
+
+[mappings.piops]
+service        = "AmazonRDS"
+product_family = "Provisioned IOPS"
+attribute_filters = [
+  # gp3 above the included baseline and io1/io2 bill per IOPS-month;
+  # usagetype separates the gp3 ($0.02) and classic PIOPS ($0.10)
+  # meters and the Multi-AZ variants.
+  { key = "usagetype", expr = """
+      default(storage_type, "gp2") == "gp3" ?
+        (default(multi_az, false) ? "RDS:Multi-AZ-GP3-PIOPS" : "RDS:GP3-PIOPS") :
+        (default(multi_az, false) ? "RDS:Multi-AZ-PIOPS" : "RDS:PIOPS")
+  """ },
+]
+
+[[dimensions]]
+id       = "instance_hours"
+label    = "Database instance"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'pick(default(multi_az, false), price("instance_multi_az"), price("instance_single_az"))'
+
+[[dimensions]]
+id       = "storage"
+label    = "Storage"
+unit     = "GB-month"
+quantity = "default(allocated_storage, 20)"
+rate     = 'price("storage")'
+
+[[dimensions]]
+id       = "provisioned_iops"
+label    = "Provisioned IOPS"
+unit     = "IOPS-month"
+when     = "default(iops, 0) > 0"
+quantity = """
+  default(storage_type, "gp2") == "gp3" ?
+    (default(iops, 0) > 12000 ? default(iops, 0) - 12000 : 0) :
+    default(iops, 0)
+"""
+rate     = 'price("piops")'
+
+[[dimensions]]
+id       = "backup_storage"
+label    = "Backup storage (beyond retention)"
+unit     = "GB-month"
+when     = "default(backup_retention_period, 0) > 0"
+quantity = "default(monthly_additional_backup_storage_gb, 0)"
+rate     = 'price("backup")'
+
+[fixture]
+attributes = { allocated_storage = 100, engine = "postgres", instance_class = "db.t3.medium", multi_az = false, storage_type = "gp3" }
+expected_monthly_cost = 87.06
+tolerance = 0.05
+

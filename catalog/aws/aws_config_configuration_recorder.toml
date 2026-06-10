@@ -1,0 +1,25 @@
+kind         = "aws_config_configuration_recorder"
+display_name = "AWS Config Recorder"
+provider     = "aws"
+
+# AWS Config bills per configuration item recorded ($0.003/CI).
+
+[mappings.config_items]
+service        = "AWSConfig"
+product_family = "Management Tools - AWS Config"
+attribute_filters = [
+  { key = "usagetype", const = "ConfigurationItemRecorded" },
+]
+
+[[dimensions]]
+id       = "config_items"
+label    = "Configuration items recorded"
+unit     = "items"
+quantity = "default(monthly_config_items, 0)"
+rate     = 'price("config_items")'
+when     = "default(monthly_config_items, 0) > 0"
+
+[fixture]
+attributes = { monthly_config_items = 10000 }
+expected_monthly_cost = 30
+tolerance = 0.05

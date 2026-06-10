@@ -1,0 +1,53 @@
+kind         = "aws_dms_replication_instance"
+display_name = "AWS DMS Replication Instance"
+provider     = "aws"
+
+# DMS bills per replication-instance-hour and per-GB-month of storage.
+# The single-AZ vs multi-AZ split applies to the instance fee.
+
+# The upstream catalog stores DMS instances under productFamily
+# "Replication Server" and exposes the deployment mode via
+# `availabilityZone` ("Single" / "Multiple"). `instanceType` is the
+# bare EC2 type ("t3.micro"), so we strip the `dms.` prefix from the
+# Terraform value.
+
+[mappings.instance_single_az]
+service        = "AWSDatabaseMigrationSvc"
+product_family = "Replication Server"
+attribute_filters = [
+  { key = "instanceType",     expr = 'strip_prefix(default(replication_instance_class, "dms.t3.micro"), "dms.")' },
+  { key = "availabilityZone", const = "Single" },
+]
+
+[mappings.instance_multi_az]
+service        = "AWSDatabaseMigrationSvc"
+product_family = "Replication Server"
+attribute_filters = [
+  { key = "instanceType",     expr = 'strip_prefix(default(replication_instance_class, "dms.t3.micro"), "dms.")' },
+  { key = "availabilityZone", const = "Multiple" },
+]
+
+[mappings.storage]
+service        = "AWSDatabaseMigrationSvc"
+product_family = "Replication Storage"
+attribute_filters = []
+
+[[dimensions]]
+id       = "instance_hours"
+label    = "Replication instance"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'pick(default(multi_az, false), price("instance_multi_az"), price("instance_single_az"))'
+
+[[dimensions]]
+id       = "storage"
+label    = "Storage"
+unit     = "GB-month"
+quantity = "default(allocated_storage, 50)"
+rate     = 'price("storage")'
+
+[fixture]
+attributes = { allocated_storage = 50, multi_az = false, replication_instance_class = "dms.t3.micro" }
+expected_monthly_cost = 25.08
+tolerance = 0.05
+

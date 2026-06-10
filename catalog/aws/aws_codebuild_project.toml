@@ -1,0 +1,23 @@
+kind         = "aws_codebuild_project"
+display_name = "AWS CodeBuild Project"
+provider     = "aws"
+
+[mappings.build_minutes_general1_small]
+service        = "CodeBuild"
+product_family = "Compute"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-Build-Min:Linux:g1.small" },
+]
+
+[[dimensions]]
+id       = "build_minutes"
+label    = "Build minutes (general1.small)"
+unit     = "minutes"
+quantity = "default(monthly_build_minutes, 0)"
+rate     = 'price("build_minutes_general1_small")'
+
+[fixture]
+attributes = { environment_compute_type = "BUILD_GENERAL1_SMALL", monthly_build_minutes = 100 }
+expected_monthly_cost = 0.5
+tolerance = 0.05
+

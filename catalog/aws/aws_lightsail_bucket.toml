@@ -1,0 +1,26 @@
+kind         = "aws_lightsail_bucket"
+display_name = "AWS Lightsail Bucket"
+provider     = "aws"
+
+# STATIC: Lightsail Buckets bill at tier rates (5GB free / $1/mo,
+# 100GB/$3, 250GB/$5). The upstream catalog doesn't expose these
+# as discrete SKUs reachable by attribute filter. Default to the
+# Small bundle ($1/month).
+
+[[dimensions]]
+id       = "bucket"
+label    = "Lightsail bucket"
+unit     = "months"
+quantity = "1"
+rate     = '''
+  default(bundle_id, "small_1_0") == "medium_1_0" ? 3.00 :
+  default(bundle_id, "small_1_0") == "large_1_0"  ? 5.00 :
+                                                    1.00
+'''
+
+[fixture]
+attributes = { bundle_id = "small_1_0" }
+expected_monthly_cost = 1
+exact = true
+last_verified = "2026-06-09"
+

@@ -1,0 +1,40 @@
+kind         = "aws_grafana_workspace"
+display_name = "AWS Managed Grafana Workspace"
+provider     = "aws"
+
+# Managed Grafana bills per active user per month:
+#   Editor $9, Viewer $5 (Enterprise plugins $45/editor).
+
+[mappings.editor]
+service        = "AmazonGrafana"
+product_family = "User Fees"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-Grafana:EditorUser" },
+]
+
+[mappings.viewer]
+service        = "AmazonGrafana"
+product_family = "User Fees"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-Grafana:ViewerUser" },
+]
+
+[[dimensions]]
+id       = "editors"
+label    = "Editor users"
+unit     = "users"
+quantity = "default(editor_count, 1)"
+rate     = 'price("editor")'
+
+[[dimensions]]
+id       = "viewers"
+label    = "Viewer users"
+unit     = "users"
+quantity = "default(viewer_count, 0)"
+rate     = 'price("viewer")'
+when     = "default(viewer_count, 0) > 0"
+
+[fixture]
+attributes = { editor_count = 2, viewer_count = 10 }
+expected_monthly_cost = 68
+tolerance = 0.05

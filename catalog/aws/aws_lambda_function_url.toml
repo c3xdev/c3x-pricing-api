@@ -1,0 +1,18 @@
+kind         = "aws_lambda_function_url"
+display_name = "AWS Lambda Function Url"
+provider     = "aws"
+
+# FREE: structural / wiring resource — no per-resource AWS charge.
+# Data-plane fees ride on the parent or attached resources.
+
+[[dimensions]]
+id       = "free"
+label    = "Free resource"
+unit     = "n/a"
+quantity = "0"
+rate     = "0"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 0
+exact = true

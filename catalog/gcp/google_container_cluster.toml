@@ -1,0 +1,30 @@
+kind         = "google_container_cluster"
+display_name = "GCP GKE Cluster"
+provider     = "gcp"
+
+# GKE Standard charges a flat $0.10/hr control-plane fee (one zonal cluster
+# per billing account is free). Autopilot clusters bill per-pod resources
+# instead — those line items come from the workload definitions, not from
+# the cluster resource itself.
+
+[mappings.regional_cluster]
+service        = "Kubernetes Engine"
+product_family = "Compute"
+region         = "global"
+attribute_filters = [
+  { key = "description", const = "Regional Kubernetes Clusters" },
+]
+
+[[dimensions]]
+id       = "control_plane"
+label    = "GKE control plane"
+unit     = "hours"
+when     = 'default(enable_autopilot, false) == false'
+quantity = "monthly_hours()"
+rate     = 'price("regional_cluster")'
+
+[fixture]
+attributes = { enable_autopilot = false }
+expected_monthly_cost = 73
+tolerance = 0.05
+

@@ -1,0 +1,38 @@
+kind         = "aws_kinesis_stream"
+display_name = "AWS Kinesis Data Stream"
+provider     = "aws"
+
+[mappings.shard]
+service        = "AmazonKinesis"
+product_family = "Kinesis Streams"
+attribute_filters = [
+  { key = "group", const = "Provisioned shard hour" },
+]
+
+[mappings.put_payload]
+service        = "AmazonKinesis"
+product_family = "Kinesis Streams"
+attribute_filters = [
+  { key = "group", const = "PUT payload units" },
+]
+
+[[dimensions]]
+id       = "shard_hours"
+label    = "Shard provisioning"
+unit     = "shard-hours"
+when     = 'default(stream_mode_details_stream_mode, "PROVISIONED") == "PROVISIONED"'
+quantity = "default(shard_count, 1) * monthly_hours()"
+rate     = 'price("shard")'
+
+[[dimensions]]
+id       = "put_units"
+label    = "PUT payload units"
+unit     = "1M units"
+quantity = "default(monthly_put_payload_units, 0) / 1000000"
+rate     = 'price("put_payload")'
+
+[fixture]
+attributes = { monthly_put_payload_units = 1_000_000, shard_count = 2 }
+expected_monthly_cost = 21.9
+tolerance = 0.05
+

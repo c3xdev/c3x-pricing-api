@@ -1,0 +1,29 @@
+kind         = "google_compute_address"
+display_name = "GCP Compute Static IP Address"
+provider     = "gcp"
+
+# A static external IP attached to a running VM is included; unattached
+# IPs are billed per-hour. The catalog returns a two-tier price ($0 for
+# attached + $0.01/hr for unattached); the non-zero preference picks the
+# unattached rate when this dimension is active.
+
+[mappings.static_ip]
+service        = "Compute Engine"
+product_family = "Network"
+attribute_filters = [
+  { key = "description", const = "Static Ip Charge" },
+]
+
+[[dimensions]]
+id       = "unused_hours"
+label    = "Unattached static IP"
+unit     = "hours"
+when     = "default(in_use, false) == false"
+quantity = "monthly_hours()"
+rate     = 'price("static_ip")'
+
+[fixture]
+attributes = { in_use = false }
+expected_monthly_cost = 7.3
+tolerance = 0.05
+

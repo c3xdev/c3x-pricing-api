@@ -1,0 +1,28 @@
+kind         = "aws_dx_connection"
+display_name = "AWS Direct Connect Connection"
+provider     = "aws"
+
+# AWS Direct Connect bills per-port-hour by `portSpeed` (1G, 10G,
+# 100G, etc.). Each region has many usagetypes for the various
+# colocation facilities (EQMI1, MB1SD, EqDC2, ...) — limit:1 picks
+# a representative price for the speed.
+
+[mappings.port]
+service        = "AWSDirectConnect"
+product_family = "Direct Connect"
+attribute_filters = [
+  { key = "portSpeed", expr = 'default(bandwidth, "1G")' },
+]
+
+[[dimensions]]
+id       = "port_hours"
+label    = "Direct Connect port"
+unit     = "port-hours"
+quantity = "monthly_hours()"
+rate     = 'price("port")'
+
+[fixture]
+attributes = { bandwidth = "1G" }
+expected_monthly_cost = 219
+tolerance = 0.05
+

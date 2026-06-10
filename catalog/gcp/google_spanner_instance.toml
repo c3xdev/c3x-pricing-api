@@ -1,0 +1,45 @@
+kind         = "google_spanner_instance"
+display_name = "GCP Spanner Instance"
+provider     = "gcp"
+
+# Spanner regional pricing decomposes per replica: a regional
+# instance has 3 read-write replicas, each billed at the upstream
+# "Read-Write Replica" SKU ($0.30/node-hour Standard edition →
+# $0.90/node-hour total, matching the published regional rate).
+# Storage likewise bills per replica ($0.10 × 3 = $0.30/GB-month).
+# 1 node = 1000 processing units.
+
+[mappings.replica]
+service        = "Cloud Spanner"
+product_family = "ApplicationServices"
+attribute_filters = [
+  { key = "description", const = "Read-Write Replica for Standard Edition in Iowa (us-central1)" },
+]
+
+[mappings.storage]
+service        = "Cloud Spanner"
+product_family = "ApplicationServices"
+attribute_filters = [
+  { key = "description", const = "SSD Storage for Replica in  Iowa (us-central1)" },
+]
+
+[[dimensions]]
+id       = "processing_units"
+label    = "Compute capacity (3 replicas)"
+unit     = "node-replica-hours"
+quantity = "default(processing_units, 100) / 1000 * 3 * monthly_hours()"
+rate     = 'price("replica")'
+
+[[dimensions]]
+id       = "storage"
+label    = "Database storage (3 replicas)"
+unit     = "GB-replica-month"
+quantity = "default(monthly_storage_gb, 0) * 3"
+rate     = 'price("storage")'
+when     = "default(monthly_storage_gb, 0) > 0"
+
+[fixture]
+# 100 PU = 0.1 node × 3 replicas × 730 × $0.30 = $65.70; +10GB × 3 × $0.10 = $3
+attributes = { processing_units = 100, monthly_storage_gb = 10 }
+expected_monthly_cost = 68.7
+tolerance = 0.05

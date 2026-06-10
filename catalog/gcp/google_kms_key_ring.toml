@@ -1,0 +1,18 @@
+kind         = "google_kms_key_ring"
+display_name = "GCP Kms Key Ring"
+provider     = "gcp"
+
+# FREE: no per-resource GCP charge.
+
+[[dimensions]]
+id       = "free"
+label    = "Free resource"
+unit     = "n/a"
+quantity = "0"
+rate     = "0"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 0
+exact = true
+

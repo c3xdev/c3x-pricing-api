@@ -1,0 +1,30 @@
+kind         = "aws_fsx_openzfs_file_system"
+display_name = "AWS FSx for OpenZFS"
+provider     = "aws"
+
+[mappings.storage]
+service        = "AmazonFSx"
+product_family = "Storage"
+attribute_filters = [
+  { key = "fileSystemType",   const = "OpenZFS" },
+  { key = "storageType",      const = "SSD" },
+  { key = "deploymentOption", expr = '''
+      default(deployment_type, "SINGLE_AZ_1") == "MULTI_AZ_1"   ? "Multi-AZ" :
+      default(deployment_type, "SINGLE_AZ_1") == "SINGLE_AZ_2"  ? "Single-AZ_2" :
+      default(deployment_type, "SINGLE_AZ_1") == "SINGLE_AZ_HA" ? "Single-AZ_HA" :
+                                                                  "Single-AZ"
+  ''' },
+]
+
+[[dimensions]]
+id       = "storage"
+label    = "Provisioned SSD storage"
+unit     = "GB-month"
+quantity = "default(storage_capacity, 64)"
+rate     = 'price("storage")'
+
+[fixture]
+attributes = { deployment_type = "SINGLE_AZ_1", storage_capacity = 64 }
+expected_monthly_cost = 5.76
+tolerance = 0.05
+

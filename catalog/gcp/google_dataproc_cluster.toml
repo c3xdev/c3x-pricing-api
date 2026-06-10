@@ -1,0 +1,20 @@
+kind         = "google_dataproc_cluster"
+display_name = "GCP Dataproc Cluster"
+provider     = "gcp"
+
+# Dataproc service charge: $0.01 per vCPU-hour on top of the underlying
+# Compute Engine instances.
+
+[[dimensions]]
+id       = "cluster_hours"
+label    = "Dataproc service charge"
+unit     = "vCPU-hours"
+quantity = "default(monthly_vcpu_hours, 0)"
+rate     = "0.01"
+
+[fixture]
+attributes = { monthly_vcpu_hours = 10 }
+expected_monthly_cost = 0.1
+exact = true
+last_verified = "2026-06-09"
+

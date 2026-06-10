@@ -1,0 +1,28 @@
+kind         = "google_artifact_registry_repository"
+display_name = "GCP Artifact Registry Repository"
+provider     = "gcp"
+
+# Artifact Registry storage: $0.10/GB-month after the 0.5 GB free tier.
+
+[mappings.storage]
+service        = "Artifact Registry"
+product_family = "ApplicationServices"
+region          = "global"
+purchase_option = "any"
+attribute_filters = [
+  { key = "description", const = "Artifact Registry Storage" },
+]
+
+[[dimensions]]
+id       = "storage"
+label    = "Repository storage"
+unit     = "GB-month"
+quantity = "default(monthly_storage_gb, 0)"
+rate     = 'price("storage")'
+
+[fixture]
+attributes = { monthly_storage_gb = 10 }
+expected_monthly_cost = 1
+exact = true
+last_verified = "2026-06-09"
+

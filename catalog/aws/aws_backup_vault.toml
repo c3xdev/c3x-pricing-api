@@ -1,0 +1,64 @@
+kind         = "aws_backup_vault"
+display_name = "AWS Backup Vault"
+provider     = "aws"
+
+# AWS Backup pricing breaks down per source-resource type with
+# "warm" (recent) and "cold" storage tiers. The upstream catalog
+# stores each as a separate usagetype: USE1-WarmStorage-ByteHrs-EBS
+# for EBS-sourced backups, ...-DynamoDB-LAGV for DynamoDB, etc.
+#
+# We default to EBS warm storage (the most common case); users
+# override `source_resource_type` to pick a different meter.
+
+# The upstream catalog only exposes EBS, RDS, and Aurora backups
+# under the "-LAGV" (logically air-gapped vault) variant — the base
+# meter is absent. We use the LAGV rate for these, which is within
+# 15% of the standard published rate. DynamoDB and EFS have both
+# base and LAGV variants; we pick the base meter.
+
+[mappings.warm_ebs]
+service        = "AWSBackup"
+product_family = "AWS Backup Storage"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-WarmStorage-ByteHrs-EBS-LAGV" },
+]
+
+[mappings.warm_rds]
+service        = "AWSBackup"
+product_family = "AWS Backup Storage"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-WarmStorage-ByteHrs-Aurora-LAGV" },
+]
+
+[mappings.warm_dynamodb]
+service        = "AWSBackup"
+product_family = "AWS Backup Storage"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-WarmStorage-ByteHrs-DynamoDB" },
+]
+
+[mappings.warm_efs]
+service        = "AWSBackup"
+product_family = "AWS Backup Storage"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-WarmStorage-ByteHrs-EFS" },
+]
+
+[[dimensions]]
+id       = "warm_storage"
+label    = "Warm-storage backups"
+unit     = "GB-month"
+quantity = "default(monthly_backup_storage_gb, 0)"
+rate     = '''
+  default(source_resource_type, "EBS") == "RDS"      ? price("warm_rds") :
+  default(source_resource_type, "EBS") == "DynamoDB" ? price("warm_dynamodb") :
+  default(source_resource_type, "EBS") == "EFS"      ? price("warm_efs") :
+                                                       price("warm_ebs")
+'''
+when     = "default(monthly_backup_storage_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_backup_storage_gb = 500, source_resource_type = "EBS" }
+expected_monthly_cost = 28.75
+tolerance = 0.05
+

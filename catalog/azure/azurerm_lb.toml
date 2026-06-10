@@ -1,0 +1,49 @@
+kind         = "azurerm_lb"
+display_name = "Azure Load Balancer"
+provider     = "azure"
+
+# Azure Load Balancer pricing depends on `sku`:
+#   - Basic:     FREE (deprecated; retiring 2026-09)
+#   - Standard:  $0.025/hr for the first 5 rules + $0.01/hr per
+#                additional rule + $0.005/GB data processed
+#   - Gateway:   $0.025/hr + $0.001/GB
+#
+# STATIC: the Load Balancer meters aren't exposed under any direct
+# service name in the upstream catalogue (probed 2026-06-09).
+
+[[dimensions]]
+id       = "first_5_rules"
+label    = "Standard LB first 5 rules"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = "0.025"
+when     = 'default(sku, "Basic") == "Standard" || default(sku, "Basic") == "Gateway"'
+
+[[dimensions]]
+id       = "extra_rules"
+label    = "Additional rules (beyond 5)"
+unit     = "rule-hours"
+quantity = '''
+  default(sku, "Basic") == "Standard" ?
+    (default(rule_count, 1) > 5 ? (default(rule_count, 1) - 5) * monthly_hours() : 0) :
+    0
+'''
+rate     = "0.01"
+when     = 'default(sku, "Basic") == "Standard" && default(rule_count, 1) > 5'
+
+[[dimensions]]
+id       = "data_processed"
+label    = "Data processed"
+unit     = "GB"
+quantity = "default(monthly_data_processed_gb, 0)"
+rate     = 'default(sku, "Basic") == "Gateway" ? 0.001 : 0.005'
+when     = '''
+  (default(sku, "Basic") == "Standard" || default(sku, "Basic") == "Gateway") &&
+  default(monthly_data_processed_gb, 0) > 0
+'''
+
+[fixture]
+attributes = { sku = "Standard", rule_count = 1, monthly_data_processed_gb = 100 }
+expected_monthly_cost = 18.75
+exact = true
+last_verified = "2026-06-09"

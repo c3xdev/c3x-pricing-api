@@ -1,0 +1,23 @@
+kind         = "aws_glue_job"
+display_name = "AWS Glue Job"
+provider     = "aws"
+
+[mappings.dpu]
+service        = "AWSGlue"
+product_family = "AWS Glue"
+attribute_filters = [
+  { key = "group", const = "ETL Job run" },
+]
+
+[[dimensions]]
+id       = "dpu_hours"
+label    = "ETL DPU-hours"
+unit     = "DPU-hours"
+quantity = "default(monthly_dpu_hours, 0)"
+rate     = 'price("dpu")'
+
+[fixture]
+attributes = { monthly_dpu_hours = 10 }
+expected_monthly_cost = 4.4
+tolerance = 0.05
+

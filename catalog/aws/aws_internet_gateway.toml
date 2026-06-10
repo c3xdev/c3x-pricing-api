@@ -1,0 +1,18 @@
+kind         = "aws_internet_gateway"
+display_name = "Internet Gateway"
+provider     = "aws"
+
+# FREE: no per-resource AWS charge.
+
+[[dimensions]]
+id       = "free"
+label    = "Free resource"
+unit     = "n/a"
+quantity = "0"
+rate     = "0"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 0
+exact = true
+

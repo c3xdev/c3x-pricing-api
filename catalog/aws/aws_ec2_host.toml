@@ -1,0 +1,28 @@
+kind         = "aws_ec2_host"
+display_name = "AWS EC2 Dedicated Host"
+provider     = "aws"
+
+# Dedicated Hosts bill per host-hour by instance family. The
+# upstream catalog stores `instanceType` as the bare family code
+# ("m5", "c5", ...) for hosts.
+
+[mappings.host]
+service        = "AmazonEC2"
+product_family = "Dedicated Host"
+attribute_filters = [
+  { key = "instanceType", expr = 'default(instance_family, "m5")' },
+  { key = "capacitystatus", const = "AllocatedHost" },
+]
+
+[[dimensions]]
+id       = "host_hours"
+label    = "Dedicated host"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("host")'
+
+[fixture]
+attributes = { instance_family = "m5" }
+expected_monthly_cost = 3700.37
+tolerance = 0.05
+

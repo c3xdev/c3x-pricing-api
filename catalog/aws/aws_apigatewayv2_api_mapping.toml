@@ -1,0 +1,19 @@
+kind         = "aws_apigatewayv2_api_mapping"
+display_name = "AWS Apigatewayv2 Api Mapping"
+provider     = "aws"
+
+# FREE: no per-resource AWS charge (parent resource or data plane
+# carries the billing).
+
+[[dimensions]]
+id       = "free"
+label    = "Free resource"
+unit     = "n/a"
+quantity = "0"
+rate     = "0"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 0
+exact = true
+

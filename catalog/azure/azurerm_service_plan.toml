@@ -1,0 +1,23 @@
+kind         = "azurerm_service_plan"
+display_name = "Azure App Service Plan"
+provider     = "azure"
+
+[mappings.plan]
+service        = "Azure App Service"
+product_family = "Compute"
+attribute_filters = [
+  { key = "skuName", expr = 'default(sku_name, "B1")' },
+]
+
+[[dimensions]]
+id       = "plan_hours"
+label    = "App Service plan"
+unit     = "hours"
+quantity = "default(worker_count, 1) * monthly_hours()"
+rate     = 'price("plan")'
+
+[fixture]
+attributes = { sku_name = "B1", worker_count = 1 }
+expected_monthly_cost = 12.41
+tolerance = 0.05
+

@@ -1,0 +1,34 @@
+kind         = "azurerm_iothub"
+display_name = "Azure IoT Hub"
+provider     = "azure"
+
+# STATIC: the core IoT Hub service isn't exposed in the upstream
+# catalog under the IoT Hub service code (only Device Update is).
+# Probed 2026-06-08. Published per-unit-month rates:
+#   - B1 / S1: $25/unit-month  (400k messages/day)
+#   - B2 / S2: $250/unit-month (6M)
+#   - B3 / S3: $2500/unit-month (300M)
+#   - F1:      Free
+
+[[dimensions]]
+id       = "unit"
+label    = "IoT Hub unit"
+unit     = "unit-months"
+quantity = "default(sku_capacity, 1)"
+rate     = '''
+  default(sku_name, "S1") == "F1" ?   0 :
+  default(sku_name, "S1") == "B1" ?  25 :
+  default(sku_name, "S1") == "B2" ? 250 :
+  default(sku_name, "S1") == "B3" ? 2500 :
+  default(sku_name, "S1") == "S1" ?  25 :
+  default(sku_name, "S1") == "S2" ? 250 :
+  default(sku_name, "S1") == "S3" ? 2500 :
+                                      25
+'''
+
+[fixture]
+attributes = { sku_capacity = 1, sku_name = "S1" }
+expected_monthly_cost = 25
+exact = true
+last_verified = "2026-06-09"
+

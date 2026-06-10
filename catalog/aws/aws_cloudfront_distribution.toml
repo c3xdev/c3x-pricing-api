@@ -1,0 +1,59 @@
+kind         = "aws_cloudfront_distribution"
+display_name = "AWS CloudFront Distribution"
+provider     = "aws"
+
+# CloudFront pricing is per usagetype (regional egress code) plus per-request
+# meters. The catalog has a single product entry per region with a tiered
+# price array — the first tier is the most expensive (smallest committed
+# volume). Use that as the conservative default.
+
+[mappings.data_us]
+service        = "AmazonCloudFront"
+product_family = "Data Transfer"
+region         = "global"
+attribute_filters = [
+  { key = "usagetype",  const = "US-DataTransfer-Out-Bytes" },
+]
+
+[mappings.data_eu]
+service        = "AmazonCloudFront"
+product_family = "Data Transfer"
+region         = "global"
+attribute_filters = [
+  { key = "usagetype",  const = "EU-DataTransfer-Out-Bytes" },
+]
+
+[mappings.data_jp]
+service        = "AmazonCloudFront"
+product_family = "Data Transfer"
+region         = "global"
+attribute_filters = [
+  { key = "usagetype",  const = "JP-DataTransfer-Out-Bytes" },
+]
+
+[[dimensions]]
+id       = "data_transfer_us"
+label    = "Data transfer (US/Canada)"
+unit     = "GB"
+quantity = "default(monthly_data_transfer_us_gb, 0)"
+rate     = 'price("data_us")'
+
+[[dimensions]]
+id       = "data_transfer_eu"
+label    = "Data transfer (Europe)"
+unit     = "GB"
+quantity = "default(monthly_data_transfer_eu_gb, 0)"
+rate     = 'price("data_eu")'
+
+[[dimensions]]
+id       = "data_transfer_jp"
+label    = "Data transfer (Japan)"
+unit     = "GB"
+quantity = "default(monthly_data_transfer_jp_gb, 0)"
+rate     = 'price("data_jp")'
+
+[fixture]
+attributes = { monthly_data_transfer_us_gb = 50, monthly_https_requests = 100_000 }
+expected_monthly_cost = 4.25
+tolerance = 0.05
+

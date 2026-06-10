@@ -1,0 +1,23 @@
+kind         = "aws_ecr_repository"
+display_name = "AWS ECR Repository"
+provider     = "aws"
+
+[mappings.storage]
+service        = "AmazonECR"
+product_family = "EC2 Container Registry"
+attribute_filters = [
+  { key = "usagetype", const = "TimedStorage-ByteHrs" },
+]
+
+[[dimensions]]
+id       = "storage"
+label    = "Image storage"
+unit     = "GB-month"
+quantity = "default(monthly_storage_gb, 0)"
+rate     = 'price("storage")'
+
+[fixture]
+attributes = { monthly_storage_gb = 10 }
+expected_monthly_cost = 1
+tolerance = 0.05
+

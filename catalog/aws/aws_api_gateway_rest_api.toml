@@ -1,0 +1,23 @@
+kind         = "aws_api_gateway_rest_api"
+display_name = "AWS API Gateway (REST)"
+provider     = "aws"
+
+[mappings.requests]
+service        = "AmazonApiGateway"
+product_family = "API Calls"
+attribute_filters = [
+  { key = "operation", const = "ApiGatewayRequest" },
+]
+
+[[dimensions]]
+id       = "requests"
+label    = "REST API requests"
+unit     = "requests"
+quantity = "default(monthly_requests, 0)"
+rate     = 'price("requests")'
+
+[fixture]
+attributes = { monthly_requests = 1_000_000 }
+expected_monthly_cost = 3.5
+tolerance = 0.05
+

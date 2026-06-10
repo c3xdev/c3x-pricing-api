@@ -1,0 +1,18 @@
+kind         = "azurerm_postgresql_flexible_server_database"
+display_name = "Azure Postgresql Flexible Server Database"
+provider     = "azure"
+
+# FREE: no per-resource Azure charge (parent or data plane bills).
+
+[[dimensions]]
+id       = "free"
+label    = "Free resource"
+unit     = "n/a"
+quantity = "0"
+rate     = "0"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 0
+exact = true
+

@@ -1,0 +1,27 @@
+kind         = "google_redis_instance"
+display_name = "GCP Memorystore for Redis"
+provider     = "gcp"
+
+# Memorystore Basic tier capacity in us-central1: $0.049/GB-hour for the
+# first 4 GB tier. Use published rate.
+
+[mappings.capacity]
+service        = "Cloud Memorystore for Redis"
+product_family = "ApplicationServices"
+attribute_filters = [
+  { key = "description", const = "Redis Capacity Basic M1 Iowa/South Carolina/Oregon" },
+]
+
+[[dimensions]]
+id       = "instance"
+label    = "Redis Basic capacity"
+unit     = "GB-hours"
+quantity = "default(memory_size_gb, 1) * monthly_hours()"
+rate     = 'price("capacity")'
+
+[fixture]
+attributes = { memory_size_gb = 1, tier = "BASIC" }
+expected_monthly_cost = 35.77
+exact = true
+last_verified = "2026-06-09"
+

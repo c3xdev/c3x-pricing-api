@@ -1,0 +1,38 @@
+kind         = "azurerm_mysql_flexible_server"
+display_name = "Azure Database for MySQL Flexible Server"
+provider     = "azure"
+
+# Flexible Server pricing keys off skuName ("1 vCore", "2 vCore",
+# ...) and productName for the SKU tier. We default to General
+# Purpose Dsv6.
+
+[mappings.compute]
+service        = "Azure Database for MySQL"
+product_family = "Databases"
+attribute_filters = [
+  { key = "productName", const = "Azure Database for MySQL Flexible Server General Purpose Dsv6 Series Compute" },
+  { key = "skuName",     expr = 'string(default(vcores, 1)) + " vCore"' },
+]
+
+[[dimensions]]
+id       = "compute"
+label    = "MySQL Flexible Server compute"
+unit     = "vCore-hours"
+quantity = "monthly_hours()"
+rate     = 'price("compute")'
+
+[[dimensions]]
+id       = "storage"
+label    = "Storage"
+unit     = "GB-month"
+quantity = "default(storage_size_gb, 20)"
+# Flexible Server storage is ~$0.115/GB-month. Inline because the
+# upstream storage SKUs are tier-keyed and not cleanly addressable.
+rate     = "0.115"
+
+[fixture]
+attributes = { storage_size_gb = 20, vcores = 1 }
+expected_monthly_cost = 67.27
+exact = true
+last_verified = "2026-06-09"
+

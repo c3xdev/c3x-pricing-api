@@ -1,0 +1,23 @@
+kind         = "google_compute_disk"
+display_name = "GCP Persistent Disk"
+provider     = "gcp"
+
+[mappings.pd_standard]
+service        = "Compute Engine"
+product_family = "Storage"
+attribute_filters = [
+  { key = "description", const = "Storage PD Capacity" },
+]
+
+[[dimensions]]
+id       = "disk_storage"
+label    = "PD Standard capacity"
+unit     = "GB-month"
+quantity = "default(size, 100)"
+rate     = 'price("pd_standard")'
+
+[fixture]
+attributes = { size = 100, type = "pd-balanced" }
+expected_monthly_cost = 4
+tolerance = 0.05
+

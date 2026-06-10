@@ -1,0 +1,42 @@
+kind         = "aws_msk_cluster"
+display_name = "AWS MSK Cluster (Kafka)"
+provider     = "aws"
+
+# MSK broker pricing key off `usagetype` (e.g. USE1-Kafka.m5.large) — the
+# instance type returned by Terraform is in form "kafka.m5.large" so we
+# strip the kafka. prefix and prepend the region code. For simplicity,
+# default to m5.large in us-east-1.
+
+[mappings.broker_m5_large]
+service        = "AmazonMSK"
+product_family = "Managed Streaming for Apache Kafka (MSK)"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-Kafka.m5.large" },
+]
+
+[mappings.storage]
+service        = "AmazonMSK"
+product_family = "Managed Streaming for Apache Kafka (MSK)"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-Kafka-Broker-Storage" },
+]
+
+[[dimensions]]
+id       = "broker_hours"
+label    = "MSK brokers (m5.large)"
+unit     = "broker-hours"
+quantity = "default(number_of_broker_nodes, 3) * monthly_hours()"
+rate     = 'price("broker_m5_large")'
+
+[[dimensions]]
+id       = "broker_storage"
+label    = "Broker storage"
+unit     = "GB-month"
+quantity = "default(number_of_broker_nodes, 3) * default(broker_node_group_info_ebs_volume_size, 100)"
+rate     = 'price("storage")'
+
+[fixture]
+attributes = { broker_node_group_info_ebs_volume_size = 100, broker_node_group_info_instance_type = "kafka.m5.large", number_of_broker_nodes = 3 }
+expected_monthly_cost = 459.9
+tolerance = 0.05
+

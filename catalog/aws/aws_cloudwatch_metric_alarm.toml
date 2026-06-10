@@ -1,0 +1,35 @@
+kind         = "aws_cloudwatch_metric_alarm"
+display_name = "AWS CloudWatch Alarm"
+provider     = "aws"
+
+# CloudWatch alarms bill at $0.10/alarm-month (standard resolution) or
+# $0.30/alarm-month (high resolution, period < 60s). The upstream
+# catalog exposes the standard meter under productFamily "Alarm". High-
+# res alarms are gated by `period < 60` on the parsed resource.
+
+[mappings.standard]
+service        = "AmazonCloudWatch"
+product_family = "Alarm"
+attribute_filters = [
+  { key = "alarmType", const = "Standard" },
+]
+
+[mappings.high_resolution]
+service        = "AmazonCloudWatch"
+product_family = "Alarm"
+attribute_filters = [
+  { key = "alarmType", const = "High Resolution" },
+]
+
+[[dimensions]]
+id       = "alarm"
+label    = "Alarm"
+unit     = "alarm-months"
+quantity = "1"
+rate     = 'pick(default(period, 60) < 60, price("high_resolution"), price("standard"))'
+
+[fixture]
+attributes = { period = 60 }
+expected_monthly_cost = 0.1
+tolerance = 0.05
+

@@ -1,0 +1,41 @@
+kind         = "aws_efs_file_system"
+display_name = "AWS EFS File System"
+provider     = "aws"
+
+# Pricing API exposes per-region storage classes including "One Zone-General
+# Purpose" (which corresponds to default Standard pricing — historical naming).
+
+[mappings.standard]
+service        = "AmazonEFS"
+product_family = "Storage"
+attribute_filters = [
+  { key = "storageClass", const = "One Zone-General Purpose" },
+]
+
+[mappings.ia]
+service        = "AmazonEFS"
+product_family = "Storage"
+attribute_filters = [
+  { key = "storageClass", const = "Infrequent Access" },
+  { key = "operation",    const = "" },
+]
+
+[[dimensions]]
+id       = "standard_storage"
+label    = "Standard storage"
+unit     = "GB-month"
+quantity = "default(monthly_standard_storage_gb, 0)"
+rate     = 'price("standard")'
+
+[[dimensions]]
+id       = "ia_storage"
+label    = "Infrequent access storage"
+unit     = "GB-month"
+quantity = "default(monthly_ia_storage_gb, 0)"
+rate     = 'price("ia")'
+
+[fixture]
+attributes = { monthly_standard_storage_gb = 100 }
+expected_monthly_cost = 16
+tolerance = 0.05
+

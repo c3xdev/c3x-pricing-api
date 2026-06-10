@@ -1,0 +1,22 @@
+kind         = "aws_eip"
+display_name = "AWS Elastic IP Address"
+provider     = "aws"
+
+# AWS charges $0.005/hr for every public IPv4 address since Feb 2024 —
+# whether or not it's attached to a running instance. The upstream
+# catalogue exposes this under AmazonEC2 with a non-trivial filter shape;
+# fall back to the published rate so the line item is never silently zero.
+
+[[dimensions]]
+id       = "ip_hours"
+label    = "Public IPv4 address-hour"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = "0.005"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 3.65
+exact = true
+last_verified = "2026-06-09"
+

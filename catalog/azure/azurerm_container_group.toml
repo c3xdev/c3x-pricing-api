@@ -1,0 +1,40 @@
+kind         = "azurerm_container_group"
+display_name = "Azure Container Instances"
+provider     = "azure"
+
+# ACI bills per vCPU-second and per GB-second of memory. Upstream
+# stores per-hour rates which we convert.
+
+[mappings.vcpu]
+service        = "Container Instances"
+product_family = "Containers"
+attribute_filters = [
+  { key = "meterName", const = "vCPU Duration" },
+]
+
+[mappings.memory]
+service        = "Container Instances"
+product_family = "Containers"
+attribute_filters = [
+  { key = "meterName", const = "Memory Duration" },
+]
+
+[[dimensions]]
+id       = "vcpu_seconds"
+label    = "Container vCPU"
+unit     = "vCPU-seconds"
+quantity = "default(cpu, 1) * monthly_hours() * 3600"
+rate     = 'price("vcpu")'
+
+[[dimensions]]
+id       = "memory_seconds"
+label    = "Container memory"
+unit     = "GB-seconds"
+quantity = "default(memory, 1.5) * monthly_hours() * 3600"
+rate     = 'price("memory")'
+
+[fixture]
+attributes = { cpu = 1, memory = 1.5 }
+expected_monthly_cost = 2775.17
+tolerance = 0.05
+

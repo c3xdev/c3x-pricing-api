@@ -1,0 +1,28 @@
+kind         = "azurerm_synapse_sql_pool"
+display_name = "Azure Synapse Dedicated SQL Pool"
+provider     = "azure"
+
+# STATIC: Synapse dedicated SQL pools bill per-DWU-hour. Common
+# tiers (East US, all priced uniformly per DWU):
+#   - DW100c    $1.20/hour
+#   - DW200c    $2.40/hour
+#   - DW1000c   $12.00/hour
+#
+# The upstream catalogue under "Azure Synapse Analytics" lists
+# Serverless SQL Pool and SSIS VMs but not the Dedicated tier as a
+# clean per-DWU SKU — modelled inline pending backend enrichment.
+
+[[dimensions]]
+id       = "dwu_hours"
+label    = "Dedicated SQL pool"
+unit     = "DWU-hours"
+quantity = "default(monthly_dwu_hours, 100 * monthly_hours() / 100)"
+# $0.012 per cDWU-hour (DW100c = 100 cDWU × $0.012/cDWU-hr = $1.20/hr).
+rate     = "0.012"
+
+[fixture]
+attributes = { monthly_dwu_hours = 73000 }
+# 73,000 cDWU-hours × $0.012 = $876/month (~$1.20/hr × 730 hr)
+expected_monthly_cost = 876
+exact = true
+last_verified = "2026-06-09"

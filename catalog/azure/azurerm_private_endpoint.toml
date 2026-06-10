@@ -1,0 +1,32 @@
+kind         = "azurerm_private_endpoint"
+display_name = "Azure Private Endpoint"
+provider     = "azure"
+
+# Private Endpoint bills per-endpoint hour + data processed:
+#   - Endpoint:        $0.01/hr (first 6 months free per subscription)
+#   - Inbound data:    $0.01/GB
+#   - Outbound data:   $0.01/GB
+#
+# STATIC: meters not exposed in the upstream catalogue (probed
+# 2026-06-09).
+
+[[dimensions]]
+id       = "endpoint_hours"
+label    = "Private endpoint"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = "0.01"
+
+[[dimensions]]
+id       = "data_processed"
+label    = "Data processed"
+unit     = "GB"
+quantity = "default(monthly_data_processed_gb, 0)"
+rate     = "0.01"
+when     = "default(monthly_data_processed_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_data_processed_gb = 100 }
+expected_monthly_cost = 8.3
+exact = true
+last_verified = "2026-06-09"

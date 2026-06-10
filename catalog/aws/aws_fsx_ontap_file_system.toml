@@ -1,0 +1,32 @@
+kind         = "aws_fsx_ontap_file_system"
+display_name = "AWS FSx for NetApp ONTAP"
+provider     = "aws"
+
+# FSx for ONTAP bills per-GB-month of provisioned SSD primary storage
+# plus a capacity-pool tier for cold data.
+
+[mappings.storage]
+service        = "AmazonFSx"
+product_family = "Storage"
+attribute_filters = [
+  { key = "fileSystemType",   const = "ONTAP" },
+  { key = "storageType",      const = "SSD" },
+  { key = "deploymentOption", expr = '''
+      default(deployment_type, "MULTI_AZ_1") == "SINGLE_AZ_1" ? "Single-AZ" :
+      default(deployment_type, "MULTI_AZ_1") == "MULTI_AZ_2"  ? "Multi-AZ-2" :
+                                                                "Multi-AZ"
+  ''' },
+]
+
+[[dimensions]]
+id       = "storage"
+label    = "Provisioned SSD storage"
+unit     = "GB-month"
+quantity = "default(storage_capacity, 1024)"
+rate     = 'price("storage")'
+
+[fixture]
+attributes = { deployment_type = "MULTI_AZ_1", storage_capacity = 1024 }
+expected_monthly_cost = 256
+tolerance = 0.05
+

@@ -1,0 +1,33 @@
+kind         = "aws_workspaces_workspace"
+display_name = "AWS WorkSpaces Desktop"
+provider     = "aws"
+
+# STATIC: AmazonWorkSpaces is not yet exposed in the c3x-pricing-api
+# backend (probed 2026-06-09; 0 products). Listed in
+# docs/upstream-gaps.md as a backend-enrichment item.
+#
+# WorkSpaces bills per-bundle monthly + optional hourly mode.
+# Default to the most common bundle ("VALUE" desktop, monthly):
+# $25/month. AlwaysOn billing applies even if the WorkSpace is
+# unused.
+
+[[dimensions]]
+id       = "monthly_bundle"
+label    = "WorkSpace (monthly billing)"
+unit     = "months"
+quantity = "1"
+rate     = '''
+  default(workspace_properties_compute_type_name, "VALUE") == "POWER"        ? 60.0  :
+  default(workspace_properties_compute_type_name, "VALUE") == "POWERPRO"     ? 88.0  :
+  default(workspace_properties_compute_type_name, "VALUE") == "GRAPHICSPRO"  ? 220.0 :
+  default(workspace_properties_compute_type_name, "VALUE") == "PERFORMANCE"  ? 39.0  :
+  default(workspace_properties_compute_type_name, "VALUE") == "STANDARD"     ? 35.0  :
+                                                                                25.0
+'''
+when = 'default(workspace_properties_running_mode, "ALWAYS_ON") == "ALWAYS_ON"'
+
+[fixture]
+attributes = { workspace_properties_compute_type_name = "VALUE", workspace_properties_running_mode = "ALWAYS_ON" }
+expected_monthly_cost = 25
+exact = true
+last_verified = "2026-06-09"

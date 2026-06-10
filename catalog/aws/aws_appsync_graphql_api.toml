@@ -1,0 +1,40 @@
+kind         = "aws_appsync_graphql_api"
+display_name = "AWS AppSync GraphQL API"
+provider     = "aws"
+
+# AppSync bills per GraphQL operation + per real-time notification.
+
+[mappings.queries]
+service        = "AWSAppSync"
+product_family = "API Calls"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-GraphQLInvocation" },
+]
+
+[mappings.notifications]
+service        = "AWSAppSync"
+product_family = "RealTime"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-GraphQLNotification" },
+]
+
+[[dimensions]]
+id       = "queries"
+label    = "GraphQL queries"
+unit     = "operations"
+quantity = "default(monthly_queries, 0)"
+rate     = 'price("queries")'
+when     = "default(monthly_queries, 0) > 0"
+
+[[dimensions]]
+id       = "realtime_updates"
+label    = "Real-time updates"
+unit     = "messages"
+quantity = "default(monthly_realtime_updates, 0)"
+rate     = 'price("notifications")'
+when     = "default(monthly_realtime_updates, 0) > 0"
+
+[fixture]
+attributes = { monthly_queries = 10_000_000, monthly_realtime_updates = 1_000_000 }
+expected_monthly_cost = 42
+tolerance = 0.05

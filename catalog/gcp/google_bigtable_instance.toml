@@ -1,0 +1,32 @@
+kind         = "google_bigtable_instance"
+display_name = "GCP Bigtable Instance"
+provider     = "gcp"
+
+# STATIC: Cloud Bigtable isn't yet exposed in the c3x-pricing-api
+# backend (probed 2026-06-09). Published rates (us-central1):
+#   - SSD storage:    $0.17/GB-month
+#   - HDD storage:    $0.026/GB-month
+#   - Node hour:      $0.65 (HA cluster requires ≥3 nodes)
+
+[[dimensions]]
+id       = "node_hours"
+label    = "Bigtable nodes"
+unit     = "node-hours"
+quantity = "default(num_nodes, 3) * monthly_hours()"
+rate     = "0.65"
+
+[[dimensions]]
+id       = "storage"
+label    = "Storage"
+unit     = "GB-month"
+quantity = "default(monthly_storage_gb, 0)"
+rate     = '''
+  default(storage_type, "SSD") == "HDD" ? 0.026 : 0.17
+'''
+when     = "default(monthly_storage_gb, 0) > 0"
+
+[fixture]
+attributes = { num_nodes = 3, storage_type = "SSD", monthly_storage_gb = 100 }
+expected_monthly_cost = 1440.5
+exact = true
+last_verified = "2026-06-09"

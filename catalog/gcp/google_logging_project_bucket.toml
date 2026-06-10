@@ -1,0 +1,34 @@
+kind         = "google_logging_project_bucket"
+display_name = "GCP Cloud Logging Bucket"
+provider     = "gcp"
+
+# Cloud Logging: $0.50/GiB ingested (first 50 GiB/project/month free),
+# $0.01/GiB-month retention beyond 30 days.
+
+[mappings.ingestion]
+service        = "Cloud Logging"
+product_family = "ApplicationServices"
+attribute_filters = [
+  { key = "description", const = "Log Storage cost" },
+]
+
+[[dimensions]]
+id       = "ingestion"
+label    = "Log volume ingested"
+unit     = "GiB"
+quantity = "default(monthly_ingestion_gib, 0)"
+rate     = 'price("ingestion")'
+
+[[dimensions]]
+id       = "retention"
+label    = "Log retention (beyond 30 days)"
+unit     = "GiB-month"
+quantity = "default(monthly_retained_gib, 0)"
+rate     = "0.01"
+
+[fixture]
+attributes = { monthly_ingestion_gib = 10 }
+expected_monthly_cost = 5
+exact = true
+last_verified = "2026-06-09"
+

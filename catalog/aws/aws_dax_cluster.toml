@@ -1,0 +1,25 @@
+kind         = "aws_dax_cluster"
+display_name = "AWS DAX Cluster"
+provider     = "aws"
+
+# DAX nodes bill per-hour by node type. The upstream stores
+# `instanceType` without the "dax." prefix Terraform uses.
+
+[mappings.node]
+service        = "AmazonDAX"
+product_family = "DAX"
+attribute_filters = [
+  { key = "instanceType", expr = 'strip_prefix(default(node_type, "dax.r5.large"), "dax.")' },
+]
+
+[[dimensions]]
+id       = "node_hours"
+label    = "DAX nodes"
+unit     = "node-hours"
+quantity = "default(replication_factor, 1) * monthly_hours()"
+rate     = 'price("node")'
+
+[fixture]
+attributes = { node_type = "dax.t3.small", replication_factor = 3 }
+expected_monthly_cost = 87.6
+tolerance = 0.05

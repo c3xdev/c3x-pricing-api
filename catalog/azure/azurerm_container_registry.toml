@@ -1,0 +1,27 @@
+kind         = "azurerm_container_registry"
+display_name = "Azure Container Registry"
+provider     = "azure"
+
+# ACR bills a per-day registry unit by SKU (Basic ≈ $5/mo,
+# Standard ≈ $20/mo, Premium ≈ $50/mo) plus overage storage.
+
+[mappings.unit]
+service        = "Container Registry"
+product_family = "Containers"
+attribute_filters = [
+  { key = "skuName",   expr = 'default(sku, "Basic")' },
+  { key = "meterName", expr = 'default(sku, "Basic") + " Registry Unit"' },
+]
+
+[[dimensions]]
+id       = "registry_days"
+label    = "Registry unit"
+unit     = "days"
+quantity = "30"
+rate     = 'price("unit")'
+
+[fixture]
+# Standard: 30 days × $0.6666 ≈ $20
+attributes = { sku = "Standard" }
+expected_monthly_cost = 20
+tolerance = 0.05

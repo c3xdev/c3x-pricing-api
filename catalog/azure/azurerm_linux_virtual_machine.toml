@@ -1,0 +1,63 @@
+kind         = "azurerm_linux_virtual_machine"
+display_name = "Azure Linux Virtual Machine"
+provider     = "azure"
+
+# Match the canonical "regular" pricing for Linux VMs by filtering against
+# the meterName that has no Spot/Low Priority suffix. Note: the upstream
+# returns both Linux and Windows variants for a given skuName — without a
+# productName filter we may pick the first match. In practice Linux is
+# the first hit, but a richer rule (productName containing the family
+# suffix vs " Windows") would be more robust. Tracked in CATALOG_STATUS.
+
+[mappings.compute]
+service        = "Virtual Machines"
+product_family = "Compute"
+attribute_filters = [
+  { key = "skuName", expr = 'default(size, "Standard_D2s_v5")' },
+]
+
+[[dimensions]]
+id       = "compute_hours"
+label    = "Virtual machine"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("compute")'
+
+[mappings.os_disk]
+service        = "Storage"
+product_family = "Storage"
+attribute_filters = [
+  # Managed disks bill per tier; map disk_size_gb to the smallest
+  # tier that fits (P/E/S × 4..50), mirroring Azure's tier ladder.
+  { key = "meterName", expr = """
+      (default(os_disk_storage_account_type, "Premium_LRS") == "Premium_LRS" ? "P" :
+       default(os_disk_storage_account_type, "Premium_LRS") == "StandardSSD_LRS" ? "E" : "S") +
+      (default(os_disk_disk_size_gb, 128) <= 32 ? "4" :
+       default(os_disk_disk_size_gb, 128) <= 64 ? "6" :
+       default(os_disk_disk_size_gb, 128) <= 128 ? "10" :
+       default(os_disk_disk_size_gb, 128) <= 256 ? "15" :
+       default(os_disk_disk_size_gb, 128) <= 512 ? "20" :
+       default(os_disk_disk_size_gb, 128) <= 1024 ? "30" :
+       default(os_disk_disk_size_gb, 128) <= 2048 ? "40" : "50") +
+      " LRS Disk"
+  """ },
+  { key = "productName", expr = """
+      default(os_disk_storage_account_type, "Premium_LRS") == "Premium_LRS" ? "Premium SSD Managed Disks" :
+      default(os_disk_storage_account_type, "Premium_LRS") == "StandardSSD_LRS" ? "Standard SSD Managed Disks" :
+                                                                                  "Standard HDD Managed Disks"
+  """ },
+]
+
+[[dimensions]]
+id       = "os_disk"
+label    = "OS disk (managed)"
+unit     = "disk-months"
+when     = "default(os_disk_disk_size_gb, 0) > 0"
+quantity = "1"
+rate     = 'price("os_disk")'
+
+[fixture]
+attributes = { size = "Standard_D2s_v5" }
+expected_monthly_cost = 137.24
+tolerance = 0.05
+

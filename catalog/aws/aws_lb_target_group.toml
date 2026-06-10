@@ -1,0 +1,19 @@
+kind         = "aws_lb_target_group"
+display_name = "AWS Load Balancer Target Group"
+provider     = "aws"
+
+# Target groups don't bill independently — the parent aws_lb covers all
+# usage. Declared so c3x lists the resource type rather than skipping it.
+
+[[dimensions]]
+id       = "free"
+label    = "Target group (no charge — billed via parent load balancer)"
+unit     = "n/a"
+quantity = "0"
+rate     = "0"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 0
+exact = true
+

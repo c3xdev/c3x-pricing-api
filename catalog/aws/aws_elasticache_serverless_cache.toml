@@ -1,0 +1,80 @@
+kind         = "aws_elasticache_serverless_cache"
+display_name = "AWS ElastiCache Serverless Cache"
+provider     = "aws"
+
+# ElastiCache Serverless bills three meters per supported engine
+# (Redis, Memcached, Valkey):
+#   - CachedData      ($/GB-hour of stored data)
+#   - ECPU            ($/ElastiCache Processing Unit)
+#   - BackupUsage     ($/GB-month of snapshot storage)
+# All three are filtered by `cacheEngine` plus `operation`.
+
+[mappings.data]
+service        = "AmazonElastiCache"
+product_family = "ElastiCache Serverless"
+attribute_filters = [
+  { key = "cacheEngine", expr = '''
+      pick(default(engine, "redis") == "memcached", "Memcached",
+      pick(default(engine, "redis") == "valkey",   "Valkey",
+      "Redis"))
+  ''' },
+  { key = "operation", const = "CreateServerlessCache" },
+  { key = "usagetype", expr = '''
+      "USE1-CachedData:" + pick(default(engine, "redis") == "memcached", "Memcached",
+      pick(default(engine, "redis") == "valkey",   "Valkey",
+      "Redis"))
+  ''' },
+]
+
+[mappings.ecpu]
+service        = "AmazonElastiCache"
+product_family = "ElastiCache Serverless"
+attribute_filters = [
+  { key = "operation", const = "CreateServerlessCache" },
+  { key = "usagetype", expr = '''
+      "USE1-ElastiCacheProcessingUnits:" +
+      (default(engine, "redis") == "memcached" ? "Memcached" :
+       default(engine, "redis") == "valkey"   ? "Valkey"   :
+                                                "Redis")
+  ''' },
+]
+
+[mappings.backup]
+service        = "AmazonElastiCache"
+product_family = "ElastiCache Serverless"
+attribute_filters = [
+  { key = "operation", const = "CreateServerlessCacheSnapshot" },
+  { key = "usagetype", expr = '''
+      "USE1-BackupUsage:" + pick(default(engine, "redis") == "memcached", "Memcached",
+      pick(default(engine, "redis") == "valkey",   "Valkey",
+      "Redis"))
+  ''' },
+]
+
+[[dimensions]]
+id       = "data_storage"
+label    = "Cached data"
+unit     = "GB-hours"
+quantity = "default(monthly_data_storage_gb_hours, 100)"
+rate     = 'price("data")'
+
+[[dimensions]]
+id       = "ecpu"
+label    = "ECPU"
+unit     = "ECPU"
+quantity = "default(monthly_ecpu, 1000000)"
+rate     = 'price("ecpu")'
+
+[[dimensions]]
+id       = "backup_storage"
+label    = "Snapshot storage"
+unit     = "GB-month"
+when     = "default(monthly_snapshot_gb, 0) > 0"
+quantity = "default(monthly_snapshot_gb, 0)"
+rate     = 'price("backup")'
+
+[fixture]
+attributes = { engine = "redis", monthly_data_storage_gb_hours = 100, monthly_ecpu = 1_000_000, monthly_snapshot_gb = 0 }
+expected_monthly_cost = 12.5
+tolerance = 0.05
+

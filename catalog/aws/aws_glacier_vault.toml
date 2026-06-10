@@ -1,0 +1,28 @@
+kind         = "aws_glacier_vault"
+display_name = "AWS S3 Glacier Vault"
+provider     = "aws"
+
+# Glacier (Flexible Retrieval) bills per GB-month stored, plus
+# retrieval fees by tier (not modelled — retrievals are usage
+# events, supply via expedited/standard retrieval attributes when
+# needed).
+
+[mappings.storage]
+service        = "AmazonGlacier"
+product_family = "Storage"
+attribute_filters = [
+  { key = "usagetype", const = "TimedStorage-ByteHrs" },
+]
+
+[[dimensions]]
+id       = "storage"
+label    = "Archive storage"
+unit     = "GB-month"
+quantity = "default(monthly_storage_gb, 0)"
+rate     = 'price("storage")'
+when     = "default(monthly_storage_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_storage_gb = 1000 }
+expected_monthly_cost = 3.6
+tolerance = 0.05

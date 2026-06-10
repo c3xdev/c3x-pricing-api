@@ -1,0 +1,24 @@
+kind         = "azurerm_log_analytics_workspace"
+display_name = "Azure Log Analytics Workspace"
+provider     = "azure"
+
+[mappings.standard_analyzed]
+service        = "Log Analytics"
+product_family = "Management and Governance"
+region         = "global"
+attribute_filters = [
+  { key = "meterName", const = "Standard Data Analyzed" },
+]
+
+[[dimensions]]
+id       = "ingestion"
+label    = "Standard data analyzed"
+unit     = "GB"
+quantity = "default(monthly_ingestion_gb, 0)"
+rate     = 'price("standard_analyzed")'
+
+[fixture]
+attributes = { monthly_ingestion_gb = 10, monthly_retained_gb = 50 }
+expected_monthly_cost = 37.38
+tolerance = 0.05
+

@@ -1,0 +1,25 @@
+kind         = "aws_athena_workgroup"
+display_name = "AWS Athena Workgroup"
+provider     = "aws"
+
+# Athena bills $5 per TB scanned (on-demand SQL queries).
+
+[mappings.scanned]
+service        = "AmazonAthena"
+product_family = "Athena Queries"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-DataScannedInTB" },
+]
+
+[[dimensions]]
+id       = "data_scanned"
+label    = "Data scanned by queries"
+unit     = "TB"
+quantity = "default(monthly_scanned_tb, 0)"
+rate     = 'price("scanned")'
+when     = "default(monthly_scanned_tb, 0) > 0"
+
+[fixture]
+attributes = { monthly_scanned_tb = 1 }
+expected_monthly_cost = 5
+tolerance = 0.05

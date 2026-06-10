@@ -1,0 +1,25 @@
+kind         = "azurerm_eventhub_namespace"
+display_name = "Azure Event Hubs Namespace"
+provider     = "azure"
+
+# Standard tier bills per Throughput Unit hour.
+
+[mappings.tu]
+service        = "Event Hubs"
+product_family = "Internet of Things"
+attribute_filters = [
+  { key = "skuName",   const = "Standard" },
+  { key = "meterName", const = "Standard Throughput Unit" },
+]
+
+[[dimensions]]
+id       = "throughput_units"
+label    = "Standard throughput units"
+unit     = "TU-hours"
+quantity = "default(capacity, 1) * monthly_hours()"
+rate     = 'price("tu")'
+
+[fixture]
+attributes = { capacity = 1 }
+expected_monthly_cost = 21.9
+tolerance = 0.05

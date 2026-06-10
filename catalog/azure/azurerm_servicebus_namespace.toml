@@ -1,0 +1,30 @@
+kind         = "azurerm_servicebus_namespace"
+display_name = "Azure Service Bus Namespace"
+provider     = "azure"
+
+# Service Bus Standard tier base charge: ~$10/mo per namespace. The
+# upstream catalogue doesn't expose a clean base-charge meter; use the
+# published rate.
+
+[[dimensions]]
+id       = "namespace"
+label    = "Standard namespace base charge"
+unit     = "namespace-month"
+quantity = "1"
+rate     = "10.00"
+when     = 'default(sku, "Standard") == "Standard"'
+
+[[dimensions]]
+id       = "namespace_premium"
+label    = "Premium namespace (1 MU)"
+unit     = "namespace-month"
+quantity = "1"
+rate     = "667.95"
+when     = 'default(sku, "Standard") == "Premium"'
+
+[fixture]
+attributes = { sku = "Standard" }
+expected_monthly_cost = 10
+exact = true
+last_verified = "2026-06-09"
+

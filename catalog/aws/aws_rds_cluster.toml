@@ -1,0 +1,53 @@
+kind         = "aws_rds_cluster"
+display_name = "AWS Aurora Cluster"
+provider     = "aws"
+
+# An aws_rds_cluster carries storage + I/O for an Aurora cluster.
+# Compute (per-instance hourly fee) lives on aws_rds_cluster_instance
+# children. This split matches Terraform's resource shape.
+
+[mappings.storage]
+service        = "AmazonRDS"
+product_family = "Database Storage"
+attribute_filters = [
+  { key = "databaseEngine", expr = '''
+      pick(default(engine, "aurora-postgresql") == "aurora-mysql", "Aurora MySQL",
+      "Aurora PostgreSQL")
+  ''' },
+]
+
+[mappings.io_requests]
+service        = "AmazonRDS"
+product_family = "System Operation"
+attribute_filters = [
+  # The "System Operation" family covers many unrelated meters
+  # (snapshot export, etc.). Without the `group` constraint the
+  # filter matches non-I/O products too; pin it explicitly.
+  { key = "group", const = "Aurora I/O Operation" },
+  { key = "usagetype", const = "Aurora:StorageIOUsage" },
+  { key = "databaseEngine", expr = '''
+      pick(default(engine, "aurora-postgresql") == "aurora-mysql", "Aurora MySQL",
+      "Aurora PostgreSQL")
+  ''' },
+]
+
+[[dimensions]]
+id       = "storage"
+label    = "Cluster storage"
+unit     = "GB-month"
+quantity = "default(monthly_storage_gb, 10)"
+rate     = 'price("storage")'
+
+[[dimensions]]
+id       = "io_requests"
+label    = "I/O requests"
+unit     = "1M-requests"
+when     = "default(monthly_io_requests, 0) > 0"
+quantity = "default(monthly_io_requests, 0) / 1000000"
+rate     = 'price("io_requests")'
+
+[fixture]
+attributes = { engine = "aurora-postgresql", monthly_io_requests = 10_000_000, monthly_storage_gb = 100 }
+expected_monthly_cost = 22.6
+tolerance = 0.05
+

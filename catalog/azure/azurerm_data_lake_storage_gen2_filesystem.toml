@@ -1,0 +1,19 @@
+kind         = "azurerm_data_lake_storage_gen2_filesystem"
+display_name = "Azure Data Lake Storage Gen2 Filesystem"
+provider     = "azure"
+
+# FREE: the filesystem itself is a no-charge container. Data, ops,
+# and hierarchical-namespace overhead bill via the parent
+# azurerm_storage_account (which IS LIVE / priced in the catalogue).
+
+[[dimensions]]
+id       = "free"
+label    = "Free resource"
+unit     = "n/a"
+quantity = "0"
+rate     = "0"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 0
+exact = true

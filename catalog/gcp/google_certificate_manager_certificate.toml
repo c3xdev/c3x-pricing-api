@@ -1,0 +1,20 @@
+kind         = "google_certificate_manager_certificate"
+display_name = "GCP Certificate Manager Certificate"
+provider     = "gcp"
+
+# FREE: Google-managed public TLS certificates are issued and
+# renewed at no charge. Customer-uploaded certs are also free at
+# rest; the Certificate Manager API itself bills only for
+# operations beyond the free quota.
+
+[[dimensions]]
+id       = "free"
+label    = "Free resource"
+unit     = "n/a"
+quantity = "0"
+rate     = "0"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 0
+exact = true

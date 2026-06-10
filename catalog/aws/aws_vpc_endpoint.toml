@@ -1,0 +1,27 @@
+kind         = "aws_vpc_endpoint"
+display_name = "AWS VPC Endpoint"
+provider     = "aws"
+
+# Gateway endpoints (S3, DynamoDB) are free. Interface endpoints
+# (Privatelink) charge per AZ-hour + data processed.
+
+[mappings.interface_endpoint]
+service        = "AmazonVPC"
+product_family = "VpcEndpoint"
+attribute_filters = [
+  { key = "usagetype", const = "USE1-VpcEndpoint-Hours" },
+]
+
+[[dimensions]]
+id       = "endpoint_hours"
+label    = "Interface endpoint AZ-hours"
+unit     = "AZ-hours"
+when     = 'default(vpc_endpoint_type, "Gateway") == "Interface"'
+quantity = "default(monthly_az_hours, monthly_hours())"
+rate     = 'price("interface_endpoint")'
+
+[fixture]
+attributes = { vpc_endpoint_type = "Interface" }
+expected_monthly_cost = 7.3
+tolerance = 0.05
+

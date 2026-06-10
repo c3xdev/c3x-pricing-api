@@ -1,0 +1,36 @@
+kind         = "aws_documentdb_cluster"
+display_name = "AWS DocumentDB Cluster"
+provider     = "aws"
+
+# Compute (instances) bills against aws_docdb_cluster_instance separately.
+# Storage and I/O bill against the cluster itself.
+
+[mappings.storage]
+service        = "AmazonDocDB"
+product_family = "Database Storage"
+attribute_filters = []
+
+[mappings.io]
+service        = "AmazonDocDB"
+product_family = "System Operation"
+attribute_filters = []
+
+[[dimensions]]
+id       = "storage"
+label    = "Storage"
+unit     = "GB-month"
+quantity = "default(monthly_storage_gb, 0)"
+rate     = 'price("storage")'
+
+[[dimensions]]
+id       = "io_requests"
+label    = "I/O requests"
+unit     = "1M requests"
+quantity = "default(monthly_io_requests, 0) / 1000000"
+rate     = 'price("io")'
+
+[fixture]
+attributes = { monthly_io_requests = 100_000, monthly_storage_gb = 10 }
+expected_monthly_cost = 3
+tolerance = 0.05
+

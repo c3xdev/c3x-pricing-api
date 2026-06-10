@@ -1,0 +1,33 @@
+kind         = "aws_fsx_lustre_file_system"
+display_name = "AWS FSx for Lustre"
+provider     = "aws"
+
+# FSx for Lustre bills per-GB-month of provisioned storage. The
+# storage tier (Persistent SSD vs Scratch SSD) and throughput class
+# (50/100/125/200/250 MB/s per TiB for Persistent) determine the
+# rate. The upstream catalog discriminates via `usagetype` strings
+# like USE1-Storage.SSD.125 — defaults to Persistent-125 SSD.
+
+[mappings.storage]
+service        = "AmazonFSx"
+product_family = "Storage"
+attribute_filters = [
+  { key = "fileSystemType", const = "Lustre" },
+  { key = "storageType",    const = "SSD" },
+  { key = "usagetype",      expr = '''
+      "USE1-Storage.SSD." + string(default(per_unit_storage_throughput, 125))
+  ''' },
+]
+
+[[dimensions]]
+id       = "storage"
+label    = "Provisioned storage"
+unit     = "GB-month"
+quantity = "default(storage_capacity, 1200)"
+rate     = 'price("storage")'
+
+[fixture]
+attributes = { per_unit_storage_throughput = 125, storage_capacity = 1200 }
+expected_monthly_cost = 174
+tolerance = 0.05
+

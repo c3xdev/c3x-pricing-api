@@ -1,0 +1,27 @@
+kind         = "google_compute_global_address"
+display_name = "GCP Global IP Address"
+provider     = "gcp"
+
+# Global static IPs bill when reserved-but-unattached (like AWS EIP):
+#   - Unattached:   $0.010/hr (~$7.30/month)
+#   - In use:       FREE
+#
+# Terraform doesn't surface attachment state directly; users assert
+# `in_use = false` via c3x-usage.yml to model a reserved IP.
+#
+# STATIC: meter isn't exposed in the upstream catalogue under any
+# direct service name (probed 2026-06-09).
+
+[[dimensions]]
+id       = "address_hours"
+label    = "Reserved global IP (unattached)"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = "0.010"
+when     = "default(in_use, false) == false"
+
+[fixture]
+attributes = { in_use = false }
+expected_monthly_cost = 7.30
+exact = true
+last_verified = "2026-06-09"

@@ -1,0 +1,43 @@
+kind         = "azurerm_traffic_manager_profile"
+display_name = "Azure Traffic Manager Profile"
+provider     = "azure"
+
+# Traffic Manager bills per million DNS queries + per-endpoint
+# health checks.
+
+[mappings.queries]
+service        = "Traffic Manager"
+product_family = "Networking"
+region         = "Global"
+attribute_filters = [
+  { key = "meterName", const = "DNS Queries" },
+]
+
+[mappings.health_checks]
+service        = "Traffic Manager"
+product_family = "Networking"
+region         = "Global"
+attribute_filters = [
+  { key = "skuName",   const = "Azure Endpoint" },
+  { key = "meterName", const = "Azure Endpoint Health Checks" },
+]
+
+[[dimensions]]
+id       = "queries"
+label    = "DNS queries"
+unit     = "1M-queries"
+quantity = "default(monthly_queries, 0) / 1000000"
+rate     = 'price("queries")'
+when     = "default(monthly_queries, 0) > 0"
+
+[[dimensions]]
+id       = "health_checks"
+label    = "Endpoint health checks"
+unit     = "endpoint-months"
+quantity = "default(azure_endpoint_count, 1)"
+rate     = 'price("health_checks")'
+
+[fixture]
+attributes = { monthly_queries = 10_000_000, azure_endpoint_count = 2 }
+expected_monthly_cost = 6.12
+tolerance = 0.05
