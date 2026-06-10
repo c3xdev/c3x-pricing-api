@@ -47,17 +47,17 @@ var gcpServices = map[string]string{
 // invalidation is on process restart (cheap relative to the full
 // SKU pull each service triggers).
 var gcpDiscoverableServices = []string{
-	"Cloud Memorystore for Redis",  // capacity hour
-	"BigQuery",                     // on-demand analysis $/TiB
-	"Cloud Filestore",              // Standard tier capacity
-	"Cloud Bigtable",               // node-hour + storage
-	"Secret Manager",               // active version-month
-	"Cloud Key Management Service", // active key version-month
-	"Artifact Registry",            // GB-month storage
-	"Cloud Logging",                // ingestion GB
-	"Cloud Spanner",                // processing-unit / node-hour
-	"Cloud Dataflow",               // worker vCPU + memory hour
-	"Cloud Dataproc",               // service charge per vCPU-hour
+	"Cloud Memorystore for Redis",        // capacity hour
+	"BigQuery",                           // on-demand analysis $/TiB
+	"Cloud Filestore",                    // Standard tier capacity
+	"Cloud Bigtable",                     // node-hour + storage
+	"Secret Manager",                     // active version-month
+	"Cloud Key Management Service (KMS)", // active key version-month
+	"Artifact Registry",                  // GB-month storage
+	"Cloud Logging",                      // ingestion GB
+	"Cloud Spanner",                      // processing-unit / node-hour
+	"Cloud Dataflow",                     // worker vCPU + memory hour
+	"Dataproc",                           // service charge per vCPU-hour
 }
 
 type GCPScraper struct {
