@@ -171,7 +171,11 @@ func (s *GCPScraper) resolveDiscoverableServices(ctx context.Context) (map[strin
 	out := make(map[string]string, len(want))
 	pageToken := ""
 	for {
-		listURL := fmt.Sprintf("%s/services?key=%s&pageSize=500", gcpBaseURL, s.cfg.GCPAPIKey)
+		// The API key travels in the X-Goog-Api-Key header, NOT the
+		// URL: a failed request wraps the full URL into *url.Error,
+		// which would put a ?key=… secret into logs. (The SKU fetch
+		// path does the same — keep them consistent.)
+		listURL := fmt.Sprintf("%s/services?pageSize=500", gcpBaseURL)
 		if pageToken != "" {
 			listURL += "&pageToken=" + pageToken
 		}
@@ -179,6 +183,7 @@ func (s *GCPScraper) resolveDiscoverableServices(ctx context.Context) (map[strin
 		if err != nil {
 			return out, err
 		}
+		req.Header.Set("X-Goog-Api-Key", s.cfg.GCPAPIKey)
 		resp, err := s.client.Do(req)
 		if err != nil {
 			return out, err
