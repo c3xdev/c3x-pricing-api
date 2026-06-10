@@ -7,6 +7,7 @@ service        = "Virtual Machines"
 product_family = "Compute"
 attribute_filters = [
   { key = "armSkuName", expr = 'default(vm_size, "Standard_DS3_v2")' },
+  { key = "os", const = "Linux" },
 ]
 
 [[dimensions]]
@@ -18,5 +19,5 @@ rate     = 'price("compute")'
 
 [fixture]
 attributes = { vm_size = "Standard_DS3_v2", scale_settings = { max_node_count = 2 }, monthly_utilization_hours = 200 }
-expected_monthly_cost = 190.4
+expected_monthly_cost = 117.2
 tolerance = 0.10

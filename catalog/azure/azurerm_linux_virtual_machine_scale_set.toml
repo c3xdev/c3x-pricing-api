@@ -2,16 +2,14 @@ kind         = "azurerm_linux_virtual_machine_scale_set"
 display_name = "Azure Linux VM Scale Set"
 provider     = "azure"
 
-# Instances × per-hour VM rate. NOTE: until the os-attribute scrape
-# lands, the skuName-only filter can surface the Windows rate for
-# Linux sets (documented picker limitation, fixed by the next
-# Azure scrape + os filter).
+# Instances × per-hour VM rate (os-discriminated SKUs).
 
 [mappings.compute]
 service        = "Virtual Machines"
 product_family = "Compute"
 attribute_filters = [
   { key = "skuName", expr = 'default(sku, "Standard_D2s_v5")' },
+  { key = "os", const = "Linux" },
 ]
 
 [[dimensions]]
@@ -31,5 +29,5 @@ rate     = "9.60"
 
 [fixture]
 attributes = { sku = "Standard_D2s_v5", instances = 3 }
-expected_monthly_cost = 411.72
+expected_monthly_cost = 210.24
 tolerance = 0.05

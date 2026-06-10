@@ -7,6 +7,7 @@ service        = "Virtual Machines"
 product_family = "Compute"
 attribute_filters = [
   { key = "skuName", expr = 'default(sku_name, "Standard_D2s_v5")' },
+  { key = "os", const = "Linux" },
 ]
 
 [[dimensions]]
@@ -18,5 +19,5 @@ rate     = 'price("compute")'
 
 [fixture]
 attributes = { sku_name = "Standard_D2s_v5", instances = 2 }
-expected_monthly_cost = 274.48
+expected_monthly_cost = 140.16
 tolerance = 0.05

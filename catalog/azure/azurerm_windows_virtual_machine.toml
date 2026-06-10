@@ -21,8 +21,8 @@ provider     = "azure"
 service        = "Virtual Machines"
 product_family = "Compute"
 attribute_filters = [
-  { key = "skuName",     expr  = 'default(size, "Standard_D2s_v5")' },
-  { key = "productName", const = "Virtual Machines Dsv5 Series Windows" },
+  { key = "skuName", expr = 'default(size, "Standard_D2s_v5")' },
+  { key = "os",      const = "Windows" },
 ]
 
 [[dimensions]]
