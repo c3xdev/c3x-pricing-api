@@ -62,6 +62,14 @@ var azureServices = []string{
 	"Logic Apps", "SignalR", "Notification Hubs",
 	"Azure Active Directory for External Identities", "Microsoft Entra Domain Services",
 	"Container Registry", "App Configuration", "IoT Hub",
+	// Long-tail services for full Terraform azurerm coverage.
+	"ExpressRoute", "Azure NetApp Files", "Stream Analytics",
+	"Azure Analysis Services", "Azure Data Explorer", "Azure Spring Apps",
+	"Azure Purview", "Azure Managed Grafana", "Azure Load Testing",
+	"Azure Digital Twins", "Azure Site Recovery", "Machine Learning",
+	"Sentinel", "Azure Maps", "Media Services", "Azure Container Apps",
+	"Azure Health Data Services", "Time Series Insights", "Azure Sphere",
+	"Azure Lab Services", "Azure Communication Services",
 }
 
 // ScrapeWithHandler streams Azure products to the handler per-service instead of
