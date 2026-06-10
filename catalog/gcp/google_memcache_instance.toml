@@ -1,0 +1,25 @@
+kind         = "google_memcache_instance"
+display_name = "GCP Memorystore Memcached"
+provider     = "gcp"
+
+# STATIC: $0.0466/vCPU-hr + $0.009/GB-hr per node.
+
+[[dimensions]]
+id       = "vcpu"
+label    = "Node vCPUs"
+unit     = "vCPU-hours"
+quantity = "default(node_count, 1) * default(node_config_cpu_count, 1) * monthly_hours()"
+rate     = "0.0466"
+
+[[dimensions]]
+id       = "memory"
+label    = "Node memory"
+unit     = "GB-hours"
+quantity = "default(node_count, 1) * default(node_config_memory_size_mb, 1024) / 1024 * monthly_hours()"
+rate     = "0.009"
+
+[fixture]
+attributes = { node_count = 2, node_config = { cpu_count = 2, memory_size_mb = 4096 } }
+expected_monthly_cost = 188.63
+exact = true
+last_verified = "2026-06-10"

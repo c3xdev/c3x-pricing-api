@@ -1,0 +1,28 @@
+kind         = "aws_guardduty_detector"
+display_name = "AWS GuardDuty Detector"
+provider     = "aws"
+
+# Usage: CloudTrail events $4.00/M + VPC/DNS logs $1.00/GB
+# (first-tier rates).
+
+[[dimensions]]
+id       = "events"
+label    = "CloudTrail events analyzed"
+unit     = "1M events"
+quantity = "default(monthly_events_millions, 0)"
+rate     = "4.00"
+when     = "default(monthly_events_millions, 0) > 0"
+
+[[dimensions]]
+id       = "logs"
+label    = "VPC flow + DNS logs analyzed"
+unit     = "GB"
+quantity = "default(monthly_log_gb, 0)"
+rate     = "1.00"
+when     = "default(monthly_log_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_events_millions = 10, monthly_log_gb = 100 }
+expected_monthly_cost = 140
+exact = true
+last_verified = "2026-06-10"

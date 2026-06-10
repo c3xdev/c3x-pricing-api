@@ -1,0 +1,22 @@
+kind         = "azurerm_batch_pool"
+display_name = "Azure Batch Pool"
+provider     = "azure"
+
+[mappings.compute]
+service        = "Virtual Machines"
+product_family = "Compute"
+attribute_filters = [
+  { key = "skuName", expr = 'default(vm_size, "Standard_D2s_v5")' },
+]
+
+[[dimensions]]
+id       = "nodes"
+label    = "Pool nodes"
+unit     = "node-hours"
+quantity = "default(fixed_scale_target_dedicated_nodes, 1) * monthly_hours()"
+rate     = 'price("compute")'
+
+[fixture]
+attributes = { vm_size = "Standard_D2s_v5", fixed_scale = { target_dedicated_nodes = 2 } }
+expected_monthly_cost = 274.48
+tolerance = 0.05

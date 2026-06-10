@@ -1,0 +1,20 @@
+kind         = "azurerm_sentinel_log_analytics_workspace_onboarding"
+display_name = "Microsoft Sentinel Workspace"
+provider     = "azure"
+
+# Usage: Sentinel analysis ≈ $2.00/GB ingested (pay-as-you-go),
+# on top of Log Analytics ingestion.
+
+[[dimensions]]
+id       = "analysis"
+label    = "Sentinel data analysis"
+unit     = "GB"
+quantity = "default(monthly_ingestion_gb, 0)"
+rate     = "2.00"
+when     = "default(monthly_ingestion_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_ingestion_gb = 100 }
+expected_monthly_cost = 200
+exact = true
+last_verified = "2026-06-10"

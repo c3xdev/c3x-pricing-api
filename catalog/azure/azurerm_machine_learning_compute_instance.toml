@@ -1,0 +1,22 @@
+kind         = "azurerm_machine_learning_compute_instance"
+display_name = "Azure ML Compute Instance"
+provider     = "azure"
+
+[mappings.compute]
+service        = "Virtual Machines"
+product_family = "Compute"
+attribute_filters = [
+  { key = "armSkuName", expr = 'default(virtual_machine_size, "Standard_DS3_v2")' },
+]
+
+[[dimensions]]
+id       = "instance"
+label    = "Compute instance"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("compute")'
+
+[fixture]
+attributes = { virtual_machine_size = "Standard_DS3_v2" }
+expected_monthly_cost = 347.48
+tolerance = 0.10

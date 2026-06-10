@@ -1,0 +1,27 @@
+kind         = "aws_codeartifact_domain"
+display_name = "AWS CodeArtifact Domain"
+provider     = "aws"
+
+# Usage: storage $0.05/GB-month + requests $0.05/10k.
+
+[[dimensions]]
+id       = "storage"
+label    = "Artifact storage"
+unit     = "GB-month"
+quantity = "default(monthly_storage_gb, 0)"
+rate     = "0.05"
+when     = "default(monthly_storage_gb, 0) > 0"
+
+[[dimensions]]
+id       = "requests"
+label    = "Requests"
+unit     = "10k requests"
+quantity = "default(monthly_requests, 0) / 10000"
+rate     = "0.05"
+when     = "default(monthly_requests, 0) > 0"
+
+[fixture]
+attributes = { monthly_storage_gb = 100, monthly_requests = 1_000_000 }
+expected_monthly_cost = 10
+exact = true
+last_verified = "2026-06-10"

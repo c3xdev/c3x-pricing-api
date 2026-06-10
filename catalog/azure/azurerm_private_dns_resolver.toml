@@ -1,0 +1,19 @@
+kind         = "azurerm_private_dns_resolver"
+display_name = "Azure DNS Private Resolver"
+provider     = "azure"
+
+# STATIC: each endpoint (inbound/outbound) is $0.25/hr; a resolver
+# typically runs one of each.
+
+[[dimensions]]
+id       = "endpoints"
+label    = "Resolver endpoints"
+unit     = "endpoint-hours"
+quantity = "default(endpoint_count, 2) * monthly_hours()"
+rate     = "0.25"
+
+[fixture]
+attributes = { endpoint_count = 2 }
+expected_monthly_cost = 365
+exact = true
+last_verified = "2026-06-10"

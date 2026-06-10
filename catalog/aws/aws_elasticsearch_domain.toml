@@ -1,0 +1,22 @@
+kind         = "aws_elasticsearch_domain"
+display_name = "AWS Elasticsearch Domain (legacy kind)"
+provider     = "aws"
+
+[mappings.instance]
+service        = "AmazonES"
+product_family = "Amazon OpenSearch Service Instance"
+attribute_filters = [
+  { key = "instanceType", expr = 'default(cluster_config_instance_type, "t3.small.elasticsearch") | replace(".elasticsearch", ".search")' },
+]
+
+[[dimensions]]
+id       = "instances"
+label    = "Data nodes"
+unit     = "instance-hours"
+quantity = "default(cluster_config_instance_count, 1) * monthly_hours()"
+rate     = 'price("instance")'
+
+[fixture]
+attributes = { cluster_config = { instance_type = "t3.small.elasticsearch", instance_count = 1 } }
+expected_monthly_cost = 26.28
+tolerance = 0.05

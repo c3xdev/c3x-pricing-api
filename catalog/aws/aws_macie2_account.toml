@@ -1,0 +1,28 @@
+kind         = "aws_macie2_account"
+display_name = "AWS Macie Account"
+provider     = "aws"
+
+# Usage: $0.10/bucket/month evaluated + $1.00/GB inspected
+# (first-tier).
+
+[[dimensions]]
+id       = "buckets"
+label    = "Buckets evaluated"
+unit     = "bucket-months"
+quantity = "default(bucket_count, 0)"
+rate     = "0.10"
+when     = "default(bucket_count, 0) > 0"
+
+[[dimensions]]
+id       = "inspection"
+label    = "Data inspected"
+unit     = "GB"
+quantity = "default(monthly_inspected_gb, 0)"
+rate     = "1.00"
+when     = "default(monthly_inspected_gb, 0) > 0"
+
+[fixture]
+attributes = { bucket_count = 50, monthly_inspected_gb = 100 }
+expected_monthly_cost = 105
+exact = true
+last_verified = "2026-06-10"

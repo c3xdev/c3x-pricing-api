@@ -1,0 +1,18 @@
+kind         = "aws_fms_policy"
+display_name = "AWS Firewall Manager Policy"
+provider     = "aws"
+
+# STATIC: $100/policy/month.
+
+[[dimensions]]
+id       = "policy"
+label    = "Firewall Manager policy"
+unit     = "months"
+quantity = "1"
+rate     = "100.0"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 100
+exact = true
+last_verified = "2026-06-10"

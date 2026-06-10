@@ -1,0 +1,25 @@
+kind         = "azurerm_dashboard_grafana"
+display_name = "Azure Managed Grafana"
+provider     = "azure"
+
+# STATIC: Standard instance $0.085/hr + $6/active editor.
+
+[[dimensions]]
+id       = "instance"
+label    = "Grafana instance (Standard)"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = "0.085"
+
+[[dimensions]]
+id       = "editors"
+label    = "Active editors"
+unit     = "user-months"
+quantity = "default(active_editor_count, 1)"
+rate     = "6.0"
+
+[fixture]
+attributes = { active_editor_count = 1 }
+expected_monthly_cost = 68.05
+exact = true
+last_verified = "2026-06-10"

@@ -1,0 +1,18 @@
+kind         = "azurerm_purview_account"
+display_name = "Microsoft Purview Account"
+provider     = "azure"
+
+# STATIC: 1 always-on capacity unit ≈ $0.411/hr.
+
+[[dimensions]]
+id       = "capacity"
+label    = "Data Map capacity unit"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = "0.411"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 300.03
+exact = true
+last_verified = "2026-06-10"

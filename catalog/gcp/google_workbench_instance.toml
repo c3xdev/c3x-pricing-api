@@ -1,0 +1,22 @@
+kind         = "google_workbench_instance"
+display_name = "GCP Vertex AI Workbench Instance (v2)"
+provider     = "gcp"
+
+[mappings.machine]
+service        = "Compute Engine"
+product_family = "Compute Instance"
+attribute_filters = [
+  { key = "machineType", expr = 'default(gce_setup_machine_type, "e2-standard-4")' },
+]
+
+[[dimensions]]
+id       = "compute"
+label    = "Workbench instance (Compute Engine rate)"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = 'price("machine")'
+
+[fixture]
+attributes = { gce_setup = { machine_type = "e2-standard-4" } }
+expected_monthly_cost = 97.84
+tolerance = 0.05

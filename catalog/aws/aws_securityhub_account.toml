@@ -1,0 +1,20 @@
+kind         = "aws_securityhub_account"
+display_name = "AWS Security Hub Account"
+provider     = "aws"
+
+# Usage: $0.0010/security check + $0.00003/finding ingested
+# (first-tier rates).
+
+[[dimensions]]
+id       = "checks"
+label    = "Security checks"
+unit     = "checks"
+quantity = "default(monthly_checks, 0)"
+rate     = "0.0010"
+when     = "default(monthly_checks, 0) > 0"
+
+[fixture]
+attributes = { monthly_checks = 100_000 }
+expected_monthly_cost = 100
+exact = true
+last_verified = "2026-06-10"

@@ -1,0 +1,25 @@
+kind         = "google_alloydb_instance"
+display_name = "GCP AlloyDB Instance"
+provider     = "gcp"
+
+# STATIC: $0.06608/vCPU-hr + $0.0112/GB-RAM-hr (us-central1).
+
+[[dimensions]]
+id       = "vcpu"
+label    = "Instance vCPUs"
+unit     = "vCPU-hours"
+quantity = "default(machine_config_cpu_count, 2) * monthly_hours()"
+rate     = "0.06608"
+
+[[dimensions]]
+id       = "memory"
+label    = "Instance memory (8 GB per vCPU)"
+unit     = "GB-hours"
+quantity = "default(machine_config_cpu_count, 2) * 8 * monthly_hours()"
+rate     = "0.0112"
+
+[fixture]
+attributes = { machine_config = { cpu_count = 2 } }
+expected_monthly_cost = 227.29
+exact = true
+last_verified = "2026-06-10"

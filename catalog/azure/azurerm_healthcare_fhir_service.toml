@@ -1,0 +1,28 @@
+kind         = "azurerm_healthcare_fhir_service"
+display_name = "Azure Health Data FHIR Service"
+provider     = "azure"
+
+# Usage: structured storage $0.39/GB + $0.40/100k API requests
+# beyond free tier.
+
+[[dimensions]]
+id       = "storage"
+label    = "Structured storage"
+unit     = "GB-month"
+quantity = "default(storage_gb, 0)"
+rate     = "0.39"
+when     = "default(storage_gb, 0) > 0"
+
+[[dimensions]]
+id       = "requests"
+label    = "Service API requests"
+unit     = "100k requests"
+quantity = "default(monthly_requests, 0) / 100000"
+rate     = "0.40"
+when     = "default(monthly_requests, 0) > 0"
+
+[fixture]
+attributes = { storage_gb = 100, monthly_requests = 1_000_000 }
+expected_monthly_cost = 43
+exact = true
+last_verified = "2026-06-10"

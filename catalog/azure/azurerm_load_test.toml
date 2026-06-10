@@ -1,0 +1,22 @@
+kind         = "azurerm_load_test"
+display_name = "Azure Load Testing Resource"
+provider     = "azure"
+
+# Usage: $0.15 per virtual user hour beyond the 50 free VUH/month.
+
+[[dimensions]]
+id       = "vuh"
+label    = "Virtual user hours (beyond free 50)"
+unit     = "VUH"
+quantity = '''
+  default(monthly_virtual_user_hours, 0) > 50 ?
+    default(monthly_virtual_user_hours, 0) - 50 : 0
+'''
+rate     = "0.15"
+when     = "default(monthly_virtual_user_hours, 0) > 50"
+
+[fixture]
+attributes = { monthly_virtual_user_hours = 1050 }
+expected_monthly_cost = 150
+exact = true
+last_verified = "2026-06-10"

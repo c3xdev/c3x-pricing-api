@@ -1,0 +1,19 @@
+kind         = "azurerm_iothub_dps"
+display_name = "Azure IoT Hub DPS"
+provider     = "azure"
+
+# Usage: $0.123 per 1k provisioning operations.
+
+[[dimensions]]
+id       = "operations"
+label    = "Provisioning operations"
+unit     = "1k ops"
+quantity = "default(monthly_operations, 0) / 1000"
+rate     = "0.123"
+when     = "default(monthly_operations, 0) > 0"
+
+[fixture]
+attributes = { monthly_operations = 100_000 }
+expected_monthly_cost = 12.3
+exact = true
+last_verified = "2026-06-10"

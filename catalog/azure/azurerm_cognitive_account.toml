@@ -1,0 +1,20 @@
+kind         = "azurerm_cognitive_account"
+display_name = "Azure AI Services Account"
+provider     = "azure"
+
+# Usage-driven: S0 text/vision class APIs ≈ $1.00 per 1k
+# transactions (varies per API; supply monthly_transactions).
+
+[[dimensions]]
+id       = "transactions"
+label    = "API transactions (S0-class)"
+unit     = "1k transactions"
+quantity = "default(monthly_transactions, 0) / 1000"
+rate     = "1.00"
+when     = "default(monthly_transactions, 0) > 0"
+
+[fixture]
+attributes = { monthly_transactions = 100_000 }
+expected_monthly_cost = 100
+exact = true
+last_verified = "2026-06-10"

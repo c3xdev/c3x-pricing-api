@@ -1,0 +1,22 @@
+kind         = "azurerm_machine_learning_compute_cluster"
+display_name = "Azure ML Compute Cluster"
+provider     = "azure"
+
+[mappings.compute]
+service        = "Virtual Machines"
+product_family = "Compute"
+attribute_filters = [
+  { key = "armSkuName", expr = 'default(vm_size, "Standard_DS3_v2")' },
+]
+
+[[dimensions]]
+id       = "nodes"
+label    = "Compute nodes (at max scale)"
+unit     = "node-hours"
+quantity = "default(scale_settings_max_node_count, 1) * default(monthly_utilization_hours, 730)"
+rate     = 'price("compute")'
+
+[fixture]
+attributes = { vm_size = "Standard_DS3_v2", scale_settings = { max_node_count = 2 }, monthly_utilization_hours = 200 }
+expected_monthly_cost = 190.4
+tolerance = 0.10

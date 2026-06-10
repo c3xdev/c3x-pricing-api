@@ -1,0 +1,20 @@
+kind         = "aws_shield_protection"
+display_name = "AWS Shield Advanced Protection"
+provider     = "aws"
+
+# STATIC: Shield Advanced is a $3,000/month org subscription;
+# attributed here once (set monthly_subscription_share to spread
+# across protections).
+
+[[dimensions]]
+id       = "subscription"
+label    = "Shield Advanced subscription"
+unit     = "months"
+quantity = "1"
+rate     = "default(monthly_subscription_share, 3000.0)"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 3000
+exact = true
+last_verified = "2026-06-10"

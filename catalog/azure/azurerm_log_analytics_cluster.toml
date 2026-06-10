@@ -1,0 +1,18 @@
+kind         = "azurerm_log_analytics_cluster"
+display_name = "Azure Log Analytics Dedicated Cluster"
+provider     = "azure"
+
+# STATIC: 100 GB/day commitment tier ≈ $196/day.
+
+[[dimensions]]
+id       = "commitment"
+label    = "Commitment tier (100 GB/day)"
+unit     = "days"
+quantity = "30"
+rate     = "196.0"
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 5880
+exact = true
+last_verified = "2026-06-10"

@@ -1,0 +1,22 @@
+kind         = "google_api_gateway_api"
+display_name = "GCP API Gateway API"
+provider     = "gcp"
+
+# Usage: $3.00/M calls after the first 2M each month.
+
+[[dimensions]]
+id       = "calls"
+label    = "API calls (beyond free 2M)"
+unit     = "1M calls"
+quantity = '''
+  default(monthly_calls, 0) > 2000000 ?
+    (default(monthly_calls, 0) - 2000000) / 1000000 : 0
+'''
+rate     = "3.00"
+when     = "default(monthly_calls, 0) > 2000000"
+
+[fixture]
+attributes = { monthly_calls = 12_000_000 }
+expected_monthly_cost = 30
+exact = true
+last_verified = "2026-06-10"
