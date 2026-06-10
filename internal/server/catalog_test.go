@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,7 +11,7 @@ import (
 func TestCatalogEndpointServesBundle(t *testing.T) {
 	t.Parallel()
 	rec := httptest.NewRecorder()
-	handleCatalog(rec, httptest.NewRequest(http.MethodGet, "/catalog", nil))
+	handleCatalog(rec, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/catalog", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d", rec.Code)
 	}
@@ -41,10 +42,10 @@ func TestCatalogEndpointServesBundle(t *testing.T) {
 func TestCatalogEndpoint304OnMatch(t *testing.T) {
 	t.Parallel()
 	first := httptest.NewRecorder()
-	handleCatalog(first, httptest.NewRequest(http.MethodGet, "/catalog", nil))
+	handleCatalog(first, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/catalog", nil))
 	etag := first.Header().Get("ETag")
 
-	req := httptest.NewRequest(http.MethodGet, "/catalog", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/catalog", nil)
 	req.Header.Set("If-None-Match", etag)
 	rec := httptest.NewRecorder()
 	handleCatalog(rec, req)
