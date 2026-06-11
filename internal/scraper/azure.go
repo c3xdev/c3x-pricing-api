@@ -64,12 +64,15 @@ var azureServices = []string{
 	"Container Registry", "App Configuration", "IoT Hub",
 	// Long-tail services for full Terraform azurerm coverage.
 	"ExpressRoute", "Azure NetApp Files", "Stream Analytics",
-	"Azure Analysis Services", "Azure Data Explorer", "Azure Spring Apps",
-	"Azure Purview", "Azure Managed Grafana", "Azure Load Testing",
-	"Azure Digital Twins", "Azure Site Recovery", "Machine Learning",
-	"Sentinel", "Azure Maps", "Media Services", "Azure Container Apps",
-	"Azure Health Data Services", "Time Series Insights", "Azure Sphere",
-	"Azure Lab Services", "Azure Communication Services",
+	"Azure Analysis Services", "Azure Data Explorer", "Azure Spring Cloud",
+	"Azure Purview", "Azure Grafana Service",
+	"Digital Twins", "Azure Site Recovery", "Azure Machine Learning",
+	"Sentinel", "Azure Maps", "Azure Container Apps",
+	"Azure API for FHIR", "Time Series Insights", "Azure Sphere",
+	"Azure Lab Services",
+	// Verified absent from the retail catalog (2026-06-11): Azure
+	// Load Testing, Media Services (retired 2024), Communication
+	// Services — their catalog entries stay STATIC permanently.
 }
 
 // ScrapeWithHandler streams Azure products to the handler per-service instead of
