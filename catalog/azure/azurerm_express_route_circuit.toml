@@ -2,22 +2,39 @@ kind         = "azurerm_express_route_circuit"
 display_name = "Azure ExpressRoute Circuit"
 provider     = "azure"
 
-# STATIC until the ExpressRoute scrape lands: metered 1 Gbps
-# Standard port is $436/mo; 500 Mbps $290; 10 Gbps $5700.
+# Metered-data circuit port fee by bandwidth (Zone 1 pricing).
+
+[mappings.port]
+service        = "ExpressRoute"
+product_family = "Networking"
+region         = "Zone 1"
+attribute_filters = [
+  { key = "skuName", expr = '''
+      default(bandwidth_in_mbps, 1000) >= 10000 ? "10 Gbps" :
+      default(bandwidth_in_mbps, 1000) >= 5000  ? "5 Gbps" :
+      default(bandwidth_in_mbps, 1000) >= 2000  ? "2 Gbps" :
+      default(bandwidth_in_mbps, 1000) >= 1000  ? "1 Gbps" :
+      default(bandwidth_in_mbps, 1000) >= 500   ? "500 Mbps" :
+                                                  "200 Mbps"
+  ''' },
+  { key = "meterName", expr = '''
+      (default(bandwidth_in_mbps, 1000) >= 10000 ? "10 Gbps" :
+       default(bandwidth_in_mbps, 1000) >= 5000  ? "5 Gbps" :
+       default(bandwidth_in_mbps, 1000) >= 2000  ? "2 Gbps" :
+       default(bandwidth_in_mbps, 1000) >= 1000  ? "1 Gbps" :
+       default(bandwidth_in_mbps, 1000) >= 500   ? "500 Mbps" :
+                                                   "200 Mbps") + " Circuit"
+  ''' },
+]
 
 [[dimensions]]
 id       = "port_fee"
 label    = "Circuit port fee (metered)"
 unit     = "months"
 quantity = "1"
-rate     = '''
-  default(bandwidth_in_mbps, 1000) >= 10000 ? 5700.0 :
-  default(bandwidth_in_mbps, 1000) >= 1000  ?  436.0 :
-                                               290.0
-'''
+rate     = 'price("port")'
 
 [fixture]
 attributes = { bandwidth_in_mbps = 1000 }
 expected_monthly_cost = 436
-exact = true
-last_verified = "2026-06-10"
+tolerance = 0.05
