@@ -352,6 +352,13 @@ func skipPrimaryMeterFilter(item azureItem) bool {
 	// non-primary in most regions.
 	case strings.HasPrefix(item.ProductName, "Event Hubs"):
 		return true
+	// Analysis Services / Purview / Site Recovery flag nearly all
+	// commercial-region rows non-primary (only sovereign/secondary
+	// regions carry the primary flag), hiding eastus entirely.
+	case item.ServiceName == "Azure Analysis Services",
+		item.ServiceName == "Azure Purview",
+		item.ServiceName == "Azure Site Recovery":
+		return true
 	}
 	return false
 }
