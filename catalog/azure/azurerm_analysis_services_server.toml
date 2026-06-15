@@ -2,23 +2,22 @@ kind         = "azurerm_analysis_services_server"
 display_name = "Azure Analysis Services Server"
 provider     = "azure"
 
-# STATIC until the Analysis Services scrape lands: S0 $0.81/hr,
-# S1 $1.61/hr, S2 $3.23/hr, B1 $0.30/hr.
+[mappings.server]
+service        = "Azure Analysis Services"
+product_family = "Analytics"
+attribute_filters = [
+  { key = "skuName",   expr = 'default(sku, "S0")' },
+  { key = "meterName", expr = 'default(sku, "S0")' },
+]
 
 [[dimensions]]
 id       = "server_hours"
 label    = "Analysis Services instance"
 unit     = "hours"
 quantity = "monthly_hours()"
-rate     = '''
-  default(sku, "S0") == "B1" ? 0.30 :
-  default(sku, "S0") == "S1" ? 1.61 :
-  default(sku, "S0") == "S2" ? 3.23 :
-                               0.81
-'''
+rate     = 'price("server")'
 
 [fixture]
 attributes = { sku = "S0" }
 expected_monthly_cost = 591.3
-exact = true
-last_verified = "2026-06-10"
+tolerance = 0.05

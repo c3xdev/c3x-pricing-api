@@ -1,0 +1,60 @@
+kind         = "azurerm_digital_twins_instance"
+display_name = "Azure Digital Twins Instance"
+provider     = "azure"
+
+# Fully usage-driven (no standing fee): messages, operations, query
+# units. Zero by default; supply usage attributes to price.
+
+[mappings.operations]
+service        = "Digital Twins"
+product_family = "Internet of Things"
+attribute_filters = [
+  { key = "skuName",   const = "Standard" },
+  { key = "meterName", const = "Standard Operations" },
+]
+
+[mappings.messages]
+service        = "Digital Twins"
+product_family = "Internet of Things"
+attribute_filters = [
+  { key = "skuName",   const = "Standard" },
+  { key = "meterName", const = "Standard Message" },
+]
+
+[mappings.query_units]
+service        = "Digital Twins"
+product_family = "Internet of Things"
+attribute_filters = [
+  { key = "skuName",   const = "Standard" },
+  { key = "meterName", const = "Standard Query Units" },
+]
+
+[[dimensions]]
+id       = "operations"
+label    = "Operations"
+unit     = "operations"
+quantity = "default(monthly_operations, 0)"
+rate     = 'price("operations")'
+when     = "default(monthly_operations, 0) > 0"
+
+[[dimensions]]
+id       = "messages"
+label    = "Messages"
+unit     = "messages"
+quantity = "default(monthly_messages, 0)"
+rate     = 'price("messages")'
+when     = "default(monthly_messages, 0) > 0"
+
+[[dimensions]]
+id       = "query_units"
+label    = "Query units"
+unit     = "query-units"
+quantity = "default(monthly_query_units, 0)"
+rate     = 'price("query_units")'
+when     = "default(monthly_query_units, 0) > 0"
+
+[fixture]
+# 1M operations × $0.0025
+attributes = { monthly_operations = 1000000 }
+expected_monthly_cost = 2500
+tolerance = 0.05

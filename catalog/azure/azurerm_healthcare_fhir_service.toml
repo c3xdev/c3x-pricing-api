@@ -2,27 +2,42 @@ kind         = "azurerm_healthcare_fhir_service"
 display_name = "Azure Health Data FHIR Service"
 provider     = "azure"
 
-# Usage: structured storage $0.39/GB + $0.40/100k API requests
-# beyond free tier.
+# Usage-driven: structured storage per GB + provisioned throughput
+# (RU) + export. Storage is the standing component.
+
+[mappings.storage]
+service        = "Azure API for FHIR"
+product_family = "Other"
+attribute_filters = [
+  { key = "skuName",   const = "Standard" },
+  { key = "meterName", const = "Standard Structured Storage" },
+]
+
+[mappings.throughput]
+service        = "Azure API for FHIR"
+product_family = "Other"
+attribute_filters = [
+  { key = "skuName",   const = "Standard" },
+  { key = "meterName", const = "Standard 100 Provisioned Throughput" },
+]
 
 [[dimensions]]
 id       = "storage"
 label    = "Structured storage"
 unit     = "GB-month"
 quantity = "default(storage_gb, 0)"
-rate     = "0.39"
+rate     = 'price("storage")'
 when     = "default(storage_gb, 0) > 0"
 
 [[dimensions]]
-id       = "requests"
-label    = "Service API requests"
-unit     = "100k requests"
-quantity = "default(monthly_requests, 0) / 100000"
-rate     = "0.40"
-when     = "default(monthly_requests, 0) > 0"
+id       = "throughput"
+label    = "Provisioned throughput (per 100 RU)"
+unit     = "100-RU-hours"
+quantity = "default(provisioned_ru, 0) / 100 * monthly_hours()"
+rate     = 'price("throughput")'
+when     = "default(provisioned_ru, 0) > 0"
 
 [fixture]
-attributes = { storage_gb = 100, monthly_requests = 1_000_000 }
-expected_monthly_cost = 43
-exact = true
-last_verified = "2026-06-10"
+attributes = { storage_gb = 100, provisioned_ru = 0 }
+expected_monthly_cost = 25
+tolerance = 0.05

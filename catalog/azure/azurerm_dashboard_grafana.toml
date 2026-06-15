@@ -2,24 +2,42 @@ kind         = "azurerm_dashboard_grafana"
 display_name = "Azure Managed Grafana"
 provider     = "azure"
 
-# STATIC: Standard instance $0.085/hr + $6/active editor.
+# Standard plan: per-node-hour (always-on instance) + per active
+# editor/viewer user. Zone redundancy adds a node surcharge (not
+# modelled; enable via usage if used).
+
+[mappings.node]
+service        = "Azure Grafana Service"
+product_family = "Developer Tools"
+attribute_filters = [
+  { key = "skuName",   const = "Standard" },
+  { key = "meterName", const = "Standard Node" },
+]
+
+[mappings.user]
+service        = "Azure Grafana Service"
+product_family = "Developer Tools"
+attribute_filters = [
+  { key = "skuName",   const = "Standard" },
+  { key = "meterName", const = "Standard User" },
+]
 
 [[dimensions]]
-id       = "instance"
+id       = "node_hours"
 label    = "Grafana instance (Standard)"
 unit     = "hours"
 quantity = "monthly_hours()"
-rate     = "0.085"
+rate     = 'price("node")'
 
 [[dimensions]]
-id       = "editors"
-label    = "Active editors"
+id       = "users"
+label    = "Active editors/admins"
 unit     = "user-months"
-quantity = "default(active_editor_count, 1)"
-rate     = "6.0"
+quantity = "default(active_user_count, 1)"
+rate     = 'price("user")'
 
 [fixture]
-attributes = { active_editor_count = 1 }
-expected_monthly_cost = 68.05
-exact = true
-last_verified = "2026-06-10"
+# 730h × $0.0342 + 1 user × $6 = $30.97
+attributes = { active_user_count = 1 }
+expected_monthly_cost = 30.97
+tolerance = 0.05

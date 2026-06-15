@@ -2,17 +2,22 @@ kind         = "azurerm_purview_account"
 display_name = "Microsoft Purview Account"
 provider     = "azure"
 
-# STATIC: 1 always-on capacity unit ≈ $0.411/hr.
+[mappings.capacity]
+service        = "Azure Purview"
+product_family = "Analytics"
+attribute_filters = [
+  { key = "skuName",   const = "Standard" },
+  { key = "meterName", const = "Standard Capacity Unit" },
+]
 
 [[dimensions]]
 id       = "capacity"
-label    = "Data Map capacity unit"
+label    = "Data Map capacity unit (always-on)"
 unit     = "hours"
 quantity = "monthly_hours()"
-rate     = "0.411"
+rate     = 'price("capacity")'
 
 [fixture]
 attributes = {}
 expected_monthly_cost = 300.03
-exact = true
-last_verified = "2026-06-10"
+tolerance = 0.05
