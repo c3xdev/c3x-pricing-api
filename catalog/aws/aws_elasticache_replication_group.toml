@@ -1,0 +1,24 @@
+kind         = "aws_elasticache_replication_group"
+display_name = "AWS ElastiCache Replication Group"
+provider     = "aws"
+
+# Cluster-mode Redis: node_type × total nodes (shards × replicas).
+
+[mappings.node]
+service        = "AmazonElastiCache"
+product_family = "Cache Instance"
+attribute_filters = [
+  { key = "usagetype", expr = '"NodeUsage:" + default(node_type, "cache.r6g.large")' },
+]
+
+[[dimensions]]
+id       = "node_hours"
+label    = "Cache nodes"
+unit     = "node-hours"
+quantity = "default(num_node_groups, 1) * (1 + default(replicas_per_node_group, 1)) * monthly_hours()"
+rate     = 'price("node")'
+
+[fixture]
+attributes = { node_type = "cache.r6g.large", num_node_groups = 1, replicas_per_node_group = 1 }
+expected_monthly_cost = 297.84
+tolerance = 0.05

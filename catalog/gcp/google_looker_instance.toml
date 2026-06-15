@@ -1,0 +1,23 @@
+kind         = "google_looker_instance"
+display_name = "GCP Looker (Google Cloud core) Instance"
+provider     = "gcp"
+
+# STATIC: Standard edition ≈ $1.60/hr; Enterprise $2.40; Embed
+# $4.00 (platform-edition keyed).
+
+[[dimensions]]
+id       = "instance_hours"
+label    = "Looker instance"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = '''
+  default(platform_edition, "LOOKER_CORE_STANDARD") == "LOOKER_CORE_ENTERPRISE_ANNUAL" ? 2.40 :
+  default(platform_edition, "LOOKER_CORE_STANDARD") == "LOOKER_CORE_EMBED_ANNUAL"      ? 4.00 :
+                                                                                        1.60
+'''
+
+[fixture]
+attributes = { platform_edition = "LOOKER_CORE_STANDARD" }
+expected_monthly_cost = 1168
+exact = true
+last_verified = "2026-06-14"

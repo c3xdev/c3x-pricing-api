@@ -1,0 +1,19 @@
+kind         = "google_bigquery_reservation"
+display_name = "GCP BigQuery Slot Reservation"
+provider     = "gcp"
+
+# STATIC: Enterprise edition slots ≈ $0.06/slot-hour (pay-as-you-go);
+# committed 1-year is $0.048.
+
+[[dimensions]]
+id       = "slots"
+label    = "Reserved slots"
+unit     = "slot-hours"
+quantity = "default(slot_capacity, 100) * monthly_hours()"
+rate     = "0.06"
+
+[fixture]
+attributes = { slot_capacity = 100 }
+expected_monthly_cost = 4380
+exact = true
+last_verified = "2026-06-14"

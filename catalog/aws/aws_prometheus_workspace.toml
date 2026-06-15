@@ -1,0 +1,28 @@
+kind         = "aws_prometheus_workspace"
+display_name = "AWS Managed Prometheus Workspace"
+provider     = "aws"
+
+# Usage: $0.90 per 10M samples ingested + $0.03/GB-month storage +
+# $0.10 per 1M query samples.
+
+[[dimensions]]
+id       = "ingestion"
+label    = "Samples ingested"
+unit     = "10M-samples"
+quantity = "default(monthly_samples_millions, 0) / 10"
+rate     = "0.90"
+when     = "default(monthly_samples_millions, 0) > 0"
+
+[[dimensions]]
+id       = "storage"
+label    = "Metrics storage"
+unit     = "GB-month"
+quantity = "default(storage_gb, 0)"
+rate     = "0.03"
+when     = "default(storage_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_samples_millions = 1000, storage_gb = 100 }
+expected_monthly_cost = 93
+exact = true
+last_verified = "2026-06-14"

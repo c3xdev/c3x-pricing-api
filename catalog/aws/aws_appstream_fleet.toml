@@ -1,0 +1,23 @@
+kind         = "aws_appstream_fleet"
+display_name = "AWS AppStream 2.0 Fleet"
+provider     = "aws"
+
+# STATIC: general-purpose stream.standard.medium ≈ $0.10/instance-hr
+# (always-on fleet = capacity × hours). User fees billed separately.
+
+[[dimensions]]
+id       = "instance_hours"
+label    = "Fleet instances"
+unit     = "instance-hours"
+quantity = "default(compute_capacity_desired_instances, 1) * monthly_hours()"
+rate     = '''
+  default(instance_type, "stream.standard.medium") == "stream.standard.large"  ? 0.20 :
+  default(instance_type, "stream.standard.medium") == "stream.standard.xlarge" ? 0.34 :
+                                                                                0.10
+'''
+
+[fixture]
+attributes = { compute_capacity_desired_instances = 2, instance_type = "stream.standard.medium" }
+expected_monthly_cost = 146
+exact = true
+last_verified = "2026-06-14"

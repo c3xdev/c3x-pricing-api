@@ -1,0 +1,31 @@
+kind         = "google_cloudfunctions_function"
+display_name = "GCP Cloud Functions (1st gen)"
+provider     = "gcp"
+
+# Usage: invocations $0.40/M (beyond 2M free), compute GHz-second
+# $0.0000100 + GB-second $0.0000025, egress $0.12/GB.
+
+[[dimensions]]
+id       = "invocations"
+label    = "Invocations (beyond free 2M)"
+unit     = "1M-invocations"
+quantity = '''
+  default(monthly_invocations, 0) > 2000000 ?
+    (default(monthly_invocations, 0) - 2000000) / 1000000 : 0
+'''
+rate     = "0.40"
+when     = "default(monthly_invocations, 0) > 2000000"
+
+[[dimensions]]
+id       = "compute_gb_seconds"
+label    = "Memory time"
+unit     = "GB-seconds"
+quantity = "default(monthly_gb_seconds, 0)"
+rate     = "0.0000025"
+when     = "default(monthly_gb_seconds, 0) > 0"
+
+[fixture]
+attributes = { monthly_invocations = 12000000, monthly_gb_seconds = 0 }
+expected_monthly_cost = 4
+exact = true
+last_verified = "2026-06-14"

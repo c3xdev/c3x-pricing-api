@@ -1,0 +1,28 @@
+kind         = "aws_qldb_ledger"
+display_name = "AWS QLDB Ledger"
+provider     = "aws"
+
+# Usage: write IOs $0.70/1M, read IOs $0.136/1M, journal storage
+# $0.03/GB-month, indexed storage $0.25/GB-month.
+
+[[dimensions]]
+id       = "write_ios"
+label    = "Write IOs"
+unit     = "1M-IOs"
+quantity = "default(monthly_write_ios_millions, 0)"
+rate     = "0.70"
+when     = "default(monthly_write_ios_millions, 0) > 0"
+
+[[dimensions]]
+id       = "storage"
+label    = "Indexed storage"
+unit     = "GB-month"
+quantity = "default(storage_gb, 0)"
+rate     = "0.25"
+when     = "default(storage_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_write_ios_millions = 10, storage_gb = 20 }
+expected_monthly_cost = 12
+exact = true
+last_verified = "2026-06-14"

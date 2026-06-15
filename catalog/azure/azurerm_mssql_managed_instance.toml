@@ -1,0 +1,31 @@
+kind         = "azurerm_mssql_managed_instance"
+display_name = "Azure SQL Managed Instance"
+provider     = "azure"
+
+# STATIC: General Purpose Gen5 vCore ≈ $0.50/vCore-hr (compute);
+# storage 32 GB included, then $0.115/GB-month. Business Critical
+# is ~2.7×. Big standing cost — important to model.
+
+[[dimensions]]
+id       = "compute"
+label    = "vCores (GP Gen5)"
+unit     = "vCore-hours"
+quantity = "default(vcores, 4) * monthly_hours()"
+rate     = 'default(sku_name, "GP_Gen5") startsWith "BC" ? 1.35 : 0.50'
+
+[[dimensions]]
+id       = "storage"
+label    = "Storage (beyond 32 GB included)"
+unit     = "GB-month"
+quantity = '''
+  default(storage_size_in_gb, 32) > 32 ? default(storage_size_in_gb, 32) - 32 : 0
+'''
+rate     = "0.115"
+when     = "default(storage_size_in_gb, 32) > 32"
+
+[fixture]
+# 4 vCores × $0.50 × 730 = $1460
+attributes = { vcores = 4, sku_name = "GP_Gen5", storage_size_in_gb = 32 }
+expected_monthly_cost = 1460
+exact = true
+last_verified = "2026-06-14"

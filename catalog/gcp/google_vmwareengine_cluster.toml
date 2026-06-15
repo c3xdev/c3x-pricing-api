@@ -1,0 +1,19 @@
+kind         = "google_vmwareengine_cluster"
+display_name = "GCP VMware Engine Cluster"
+provider     = "gcp"
+
+# STATIC: ve2-standard-72 node ≈ $8.03/node-hour (on-demand);
+# minimum 3 nodes. Very large standing cost.
+
+[[dimensions]]
+id       = "nodes"
+label    = "ESXi nodes"
+unit     = "node-hours"
+quantity = "default(node_count, 3) * monthly_hours()"
+rate     = "8.03"
+
+[fixture]
+attributes = { node_count = 3 }
+expected_monthly_cost = 17585.7
+exact = true
+last_verified = "2026-06-14"

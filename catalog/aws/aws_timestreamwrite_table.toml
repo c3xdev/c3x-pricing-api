@@ -1,0 +1,28 @@
+kind         = "aws_timestreamwrite_table"
+display_name = "AWS Timestream Table"
+provider     = "aws"
+
+# Usage: writes $0.50/1M, memory store $0.036/GB-hr, magnetic
+# $0.03/GB-month, queries $0.01/GB scanned.
+
+[[dimensions]]
+id       = "writes"
+label    = "Writes (1KB records)"
+unit     = "1M-writes"
+quantity = "default(monthly_writes_millions, 0)"
+rate     = "0.50"
+when     = "default(monthly_writes_millions, 0) > 0"
+
+[[dimensions]]
+id       = "magnetic_storage"
+label    = "Magnetic storage"
+unit     = "GB-month"
+quantity = "default(magnetic_storage_gb, 0)"
+rate     = "0.03"
+when     = "default(magnetic_storage_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_writes_millions = 100, magnetic_storage_gb = 500 }
+expected_monthly_cost = 65
+exact = true
+last_verified = "2026-06-14"

@@ -1,0 +1,24 @@
+kind         = "azurerm_eventgrid_domain"
+display_name = "Azure Event Grid Domain"
+provider     = "azure"
+
+[mappings.operations]
+service        = "Event Grid"
+product_family = "Internet of Things"
+attribute_filters = [
+  { key = "skuName",   const = "Standard" },
+  { key = "meterName", const = "Standard Event Operations" },
+]
+
+[[dimensions]]
+id       = "operations"
+label    = "Event operations"
+unit     = "1M-operations"
+quantity = "default(monthly_operations, 0) / 1000000"
+rate     = 'price("operations")'
+when     = "default(monthly_operations, 0) > 0"
+
+[fixture]
+attributes = { monthly_operations = 10000000 }
+expected_monthly_cost = 6
+tolerance = 0.05

@@ -1,0 +1,19 @@
+kind         = "aws_acmpca_certificate_authority"
+display_name = "AWS Private Certificate Authority"
+provider     = "aws"
+
+# STATIC: $400/month per CA (general-purpose); short-lived-cert
+# mode is $50/mo. Certificates issued bill separately.
+
+[[dimensions]]
+id       = "ca"
+label    = "Private CA"
+unit     = "months"
+quantity = "1"
+rate     = 'default(usage_mode, "GENERAL_PURPOSE") == "SHORT_LIVED_CERTIFICATE" ? 50.0 : 400.0'
+
+[fixture]
+attributes = {}
+expected_monthly_cost = 400
+exact = true
+last_verified = "2026-06-14"

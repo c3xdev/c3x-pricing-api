@@ -1,0 +1,24 @@
+kind         = "azurerm_managed_lustre_file_system"
+display_name = "Azure Managed Lustre File System"
+provider     = "azure"
+
+# STATIC: AMLFS Durable-250 ≈ $0.000234/GiB-hr (≈$0.17/GiB-month);
+# tiers: 40/125/250/500 MB/s per TiB.
+
+[[dimensions]]
+id       = "capacity"
+label    = "Provisioned capacity"
+unit     = "GiB-month"
+quantity = "default(storage_capacity_in_tb, 4) * 1024"
+rate     = '''
+  default(sku_name, "AMLFS-Durable-Premium-250") == "AMLFS-Durable-Premium-500" ? 0.34 :
+  default(sku_name, "AMLFS-Durable-Premium-250") == "AMLFS-Durable-Premium-125" ? 0.10 :
+  default(sku_name, "AMLFS-Durable-Premium-250") == "AMLFS-Durable-Premium-40"  ? 0.06 :
+                                                                                 0.17
+'''
+
+[fixture]
+attributes = { storage_capacity_in_tb = 4 }
+expected_monthly_cost = 696.32
+exact = true
+last_verified = "2026-06-14"

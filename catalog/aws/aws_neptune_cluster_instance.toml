@@ -1,0 +1,24 @@
+kind         = "aws_neptune_cluster_instance"
+display_name = "AWS Neptune Cluster Instance"
+provider     = "aws"
+
+# STATIC: db.r5.large Neptune ≈ $0.348/hr (instance-class keyed;
+# the upstream meter isn't cleanly addressable).
+
+[[dimensions]]
+id       = "instance_hours"
+label    = "Neptune instance"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = '''
+  default(instance_class, "db.r5.large") == "db.r5.xlarge"  ? 0.696 :
+  default(instance_class, "db.r5.large") == "db.r5.2xlarge" ? 1.392 :
+  default(instance_class, "db.r5.large") == "db.t3.medium"  ? 0.084 :
+                                                              0.348
+'''
+
+[fixture]
+attributes = { instance_class = "db.r5.large" }
+expected_monthly_cost = 254.04
+exact = true
+last_verified = "2026-06-14"

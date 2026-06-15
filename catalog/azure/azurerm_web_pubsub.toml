@@ -1,0 +1,24 @@
+kind         = "azurerm_web_pubsub"
+display_name = "Azure Web PubSub Service"
+provider     = "azure"
+
+# STATIC: Standard_S1 unit is $1.61/unit-day; Premium_P1 $2.00.
+# Free tier $0.
+
+[[dimensions]]
+id       = "unit_days"
+label    = "Service units"
+unit     = "unit-days"
+quantity = "default(capacity, 1) * 30.4"
+rate     = '''
+  default(sku, "Standard_S1") startsWith "Premium" ? 2.00 :
+  default(sku, "Standard_S1") startsWith "Free"    ? 0.0  :
+                                                     1.61
+'''
+when     = '!(default(sku, "Standard_S1") startsWith "Free")'
+
+[fixture]
+attributes = { sku = "Standard_S1", capacity = 1 }
+expected_monthly_cost = 48.94
+exact = true
+last_verified = "2026-06-14"

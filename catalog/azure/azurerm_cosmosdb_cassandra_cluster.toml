@@ -1,0 +1,23 @@
+kind         = "azurerm_cosmosdb_cassandra_cluster"
+display_name = "Azure Managed Cassandra Cluster"
+provider     = "azure"
+
+# STATIC: managed Cassandra Standard_DS14_v2 node ≈ $2.018/hr;
+# count = nodes per datacenter.
+
+[[dimensions]]
+id       = "node_hours"
+label    = "Cassandra nodes"
+unit     = "node-hours"
+quantity = "default(node_count, 3) * monthly_hours()"
+rate     = '''
+  default(sku, "Standard_DS14_v2") == "Standard_E16s_v5" ? 1.40 :
+  default(sku, "Standard_DS14_v2") == "Standard_DS13_v2" ? 1.009 :
+                                                          2.018
+'''
+
+[fixture]
+attributes = { node_count = 3 }
+expected_monthly_cost = 4419.42
+exact = true
+last_verified = "2026-06-14"

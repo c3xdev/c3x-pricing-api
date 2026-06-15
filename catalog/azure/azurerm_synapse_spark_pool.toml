@@ -1,0 +1,25 @@
+kind         = "azurerm_synapse_spark_pool"
+display_name = "Azure Synapse Spark Pool"
+provider     = "azure"
+
+# STATIC: Memory-Optimized vCore ≈ $0.143/vCore-hr; a Small node is
+# 4 vCores. Bills only while the pool is active (auto-pause).
+
+[[dimensions]]
+id       = "vcore_hours"
+label    = "Spark vCore-hours"
+unit     = "vCore-hours"
+quantity = '''
+  default(node_count, 3) *
+  (default(node_size, "Small") == "Large" ? 16 :
+   default(node_size, "Small") == "Medium" ? 8 : 4) *
+  default(monthly_active_hours, 730)
+'''
+rate     = "0.143"
+
+[fixture]
+# 3 nodes × 4 vCore × 730 × $0.143 = $1252.68
+attributes = { node_count = 3, node_size = "Small" }
+expected_monthly_cost = 1252.68
+exact = true
+last_verified = "2026-06-14"

@@ -1,0 +1,20 @@
+kind         = "azurerm_data_protection_backup_vault"
+display_name = "Azure Backup Vault (Data Protection)"
+provider     = "azure"
+
+# Protected-instance fee + backup storage (LRS vaulted $0.10/GB).
+# Usage-driven on protected data.
+
+[[dimensions]]
+id       = "backup_storage"
+label    = "Vaulted backup storage (LRS)"
+unit     = "GB-month"
+quantity = "default(monthly_backup_storage_gb, 0)"
+rate     = "0.10"
+when     = "default(monthly_backup_storage_gb, 0) > 0"
+
+[fixture]
+attributes = { monthly_backup_storage_gb = 500 }
+expected_monthly_cost = 50
+exact = true
+last_verified = "2026-06-14"

@@ -1,0 +1,24 @@
+kind         = "azurerm_redis_enterprise_cluster"
+display_name = "Azure Cache for Redis Enterprise"
+provider     = "azure"
+
+# STATIC: Enterprise E10 ≈ $0.834/hr; E20 $1.665; E50 $4.163;
+# E100 $8.325.
+
+[[dimensions]]
+id       = "cluster_hours"
+label    = "Enterprise cluster"
+unit     = "hours"
+quantity = "monthly_hours()"
+rate     = '''
+  default(sku_name, "Enterprise_E10-2") startsWith "Enterprise_E100" ? 8.325 :
+  default(sku_name, "Enterprise_E10-2") startsWith "Enterprise_E50"  ? 4.163 :
+  default(sku_name, "Enterprise_E10-2") startsWith "Enterprise_E20"  ? 1.665 :
+                                                                       0.834
+'''
+
+[fixture]
+attributes = { sku_name = "Enterprise_E10-2" }
+expected_monthly_cost = 608.82
+exact = true
+last_verified = "2026-06-14"

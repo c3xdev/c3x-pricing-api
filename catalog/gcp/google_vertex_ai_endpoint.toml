@@ -1,0 +1,24 @@
+kind         = "google_vertex_ai_endpoint"
+display_name = "GCP Vertex AI Endpoint"
+provider     = "gcp"
+
+# STATIC: deployed-model serving on n1-standard-4 ≈ $0.2185/node-hr
+# (machine-type keyed); endpoints with no deployed model are free.
+
+[[dimensions]]
+id       = "serving"
+label    = "Model serving nodes"
+unit     = "node-hours"
+quantity = "default(min_replica_count, 0) * monthly_hours()"
+rate     = '''
+  default(machine_type, "n1-standard-4") == "n1-standard-8"  ? 0.437 :
+  default(machine_type, "n1-standard-4") == "n1-standard-16" ? 0.874 :
+                                                              0.2185
+'''
+when     = "default(min_replica_count, 0) > 0"
+
+[fixture]
+attributes = { machine_type = "n1-standard-4", min_replica_count = 1 }
+expected_monthly_cost = 159.5
+exact = true
+last_verified = "2026-06-14"

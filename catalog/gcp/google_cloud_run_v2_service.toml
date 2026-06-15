@@ -1,0 +1,43 @@
+kind         = "google_cloud_run_v2_service"
+display_name = "GCP Cloud Run Service (v2)"
+provider     = "gcp"
+
+# Request-based billing: vCPU-second + memory GiB-second while
+# handling requests. Usage-driven; zero at idle (scale-to-zero).
+
+[mappings.vcpu]
+service        = "Cloud Run"
+product_family = "ApplicationServices"
+region         = "global"
+attribute_filters = [
+  { key = "description", const = "Services CPU (Request-based billing)" },
+]
+
+[mappings.memory]
+service        = "Cloud Run"
+product_family = "ApplicationServices"
+region         = "global"
+attribute_filters = [
+  { key = "description", const = "Services Memory (Request-based billing)" },
+]
+
+[[dimensions]]
+id       = "vcpu"
+label    = "vCPU allocation time"
+unit     = "vCPU-seconds"
+quantity = "default(monthly_vcpu_seconds, 0)"
+rate     = 'price("vcpu")'
+when     = "default(monthly_vcpu_seconds, 0) > 0"
+
+[[dimensions]]
+id       = "memory"
+label    = "Memory allocation time"
+unit     = "GiB-seconds"
+quantity = "default(monthly_memory_gib_seconds, 0)"
+rate     = 'price("memory")'
+when     = "default(monthly_memory_gib_seconds, 0) > 0"
+
+[fixture]
+attributes = { monthly_vcpu_seconds = 1000000, monthly_memory_gib_seconds = 2000000 }
+expected_monthly_cost = 29.0
+tolerance = 0.10
