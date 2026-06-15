@@ -1,0 +1,29 @@
+kind         = "azurerm_maps_account"
+display_name = "Azure Maps Account"
+provider     = "azure"
+
+# Usage-driven (Gen2 S0/S1): per-transaction by category. No
+# standing fee — zero by default. Tile transactions are the common
+# dominant cost; supply usage to price.
+
+[mappings.tiles]
+service        = "Azure Maps"
+product_family = "Internet of Things"
+region         = "Global"
+attribute_filters = [
+  { key = "skuName",   const = "Standard S1" },
+  { key = "meterName", const = "Standard S1 Tile Transactions" },
+]
+
+[[dimensions]]
+id       = "tile_transactions"
+label    = "Tile transactions"
+unit     = "1k transactions"
+quantity = "default(monthly_tile_transactions, 0) / 1000"
+rate     = 'price("tiles")'
+when     = "default(monthly_tile_transactions, 0) > 0"
+
+[fixture]
+attributes = { monthly_tile_transactions = 100000 }
+expected_monthly_cost = 500
+tolerance = 0.05
