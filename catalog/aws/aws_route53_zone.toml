@@ -10,6 +10,7 @@ attribute_filters = []
 [mappings.queries]
 service        = "AmazonRoute53"
 product_family = "DNS Query"
+unit           = "Queries"
 attribute_filters = []
 
 [[dimensions]]
@@ -28,6 +29,6 @@ rate     = 'price("queries")'
 
 [fixture]
 attributes = { monthly_queries = 1_000_000 }
-expected_monthly_cost = 750000
+expected_monthly_cost = 0.6
 tolerance = 0.05
 
