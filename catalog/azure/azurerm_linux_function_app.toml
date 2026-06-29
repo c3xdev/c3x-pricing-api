@@ -2,20 +2,27 @@ kind         = "azurerm_linux_function_app"
 display_name = "Azure Functions App"
 provider     = "azure"
 
-[mappings.executions]
-service        = "Functions"
-product_family = "Compute"
-attribute_filters = []
-
+# A bare azurerm_linux_function_app defaults to the Consumption
+# (serverless) plan. Consumption billing is usage-driven: $0.20 per
+# million executions beyond the 1M/month free grant, plus GB-s of
+# execution time. The upstream catalog models the Consumption
+# ("On Demand") execution meter as $0 — it encodes only the free
+# grant, not the $0.20/M marginal rate — and the max-non-zero price
+# picker would otherwise grab the Premium-plan vCPU-hour meter
+# ($0.173/hr), a different plan with a mismatched unit. We pin the
+# published Consumption marginal rate inline so the estimate reflects
+# real per-execution cost rather than a Premium-plan misfire.
 [[dimensions]]
 id       = "executions"
 label    = "Executions"
 unit     = "1M executions"
 quantity = "default(monthly_executions, 0) / 1000000"
-rate     = 'price("executions")'
+rate     = "0.20"
 
 [fixture]
 attributes = { monthly_executions = 1_000_000 }
-expected_monthly_cost = 0.17
-tolerance = 0.05
-
+# 1M executions x $0.20/M = $0.20 (marginal Consumption rate; the
+# first 1M/month are free, so this is a conservative upper bound).
+expected_monthly_cost = 0.20
+exact = true
+last_verified = "2026-06-26"
