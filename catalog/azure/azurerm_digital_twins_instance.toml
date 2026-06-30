@@ -4,6 +4,10 @@ provider     = "azure"
 
 # Fully usage-driven (no standing fee): messages, operations, query
 # units. Zero by default; supply usage attributes to price.
+#
+# The upstream meters are priced per *1,000* units (unit "1K"), so each
+# quantity is divided by 1000 before applying the meter rate. (Omitting
+# the /1000 over-charged 1000x: ~$2,500 instead of ~$2.50 for 1M ops.)
 
 [mappings.operations]
 service        = "Digital Twins"
@@ -33,7 +37,7 @@ attribute_filters = [
 id       = "operations"
 label    = "Operations"
 unit     = "operations"
-quantity = "default(monthly_operations, 0)"
+quantity = "default(monthly_operations, 0) / 1000"
 rate     = 'price("operations")'
 when     = "default(monthly_operations, 0) > 0"
 
@@ -41,7 +45,7 @@ when     = "default(monthly_operations, 0) > 0"
 id       = "messages"
 label    = "Messages"
 unit     = "messages"
-quantity = "default(monthly_messages, 0)"
+quantity = "default(monthly_messages, 0) / 1000"
 rate     = 'price("messages")'
 when     = "default(monthly_messages, 0) > 0"
 
@@ -49,12 +53,12 @@ when     = "default(monthly_messages, 0) > 0"
 id       = "query_units"
 label    = "Query units"
 unit     = "query-units"
-quantity = "default(monthly_query_units, 0)"
+quantity = "default(monthly_query_units, 0) / 1000"
 rate     = 'price("query_units")'
 when     = "default(monthly_query_units, 0) > 0"
 
 [fixture]
-# 1M operations × $0.0025
+# 1M operations = 1,000 x 1K-op units x $0.0025 = $2.50.
 attributes = { monthly_operations = 1000000 }
-expected_monthly_cost = 2500
+expected_monthly_cost = 2.5
 tolerance = 0.05
