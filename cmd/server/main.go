@@ -144,7 +144,7 @@ func scrapeCmd() *cobra.Command {
 			for _, s := range scrapers {
 				s := s
 				g.Go(func() error {
-					return runOneScrape(gctx, database, s)
+					return runOneScrape(gctx, database, s, cfg.EnablePriceSnapshots)
 				})
 			}
 			if err := g.Wait(); err != nil {
@@ -164,7 +164,7 @@ func scrapeCmd() *cobra.Command {
 // an error only for unrecoverable problems; per-service errors within a scraper
 // are logged and the run is marked 'success' with whatever products came back,
 // which matches the existing partial-data semantics.
-func runOneScrape(ctx context.Context, database *db.DB, s scraper.Scraper) error {
+func runOneScrape(ctx context.Context, database *db.DB, s scraper.Scraper, recordSnapshots bool) error {
 	vendorName := strings.ToLower(s.Name())
 
 	locked, unlock, err := database.AcquireScrapeLock(ctx, vendorName)
@@ -194,10 +194,14 @@ func runOneScrape(ctx context.Context, database *db.DB, s scraper.Scraper) error
 		if err := database.UpsertProducts(ctx, products); err != nil {
 			return err
 		}
-		// A2: Record price snapshots for audit trail. Best-effort: snapshot
-		// failures don't abort the scrape, only log a warning.
-		if err := database.RecordPriceSnapshots(ctx, products, runID); err != nil {
-			slog.Warn("failed to record price snapshots", "vendor", s.Name(), "error", err)
+		// A2: Record price snapshots for audit trail. Disabled by default —
+		// the table has no reader and one row per product per run grew
+		// unbounded (see ENABLE_PRICE_SNAPSHOTS). Best-effort when on:
+		// snapshot failures don't abort the scrape, only log a warning.
+		if recordSnapshots {
+			if err := database.RecordPriceSnapshots(ctx, products, runID); err != nil {
+				slog.Warn("failed to record price snapshots", "vendor", s.Name(), "error", err)
+			}
 		}
 		current := atomic.AddInt64(&totalProducts, int64(len(products)))
 		slog.Info("upserted batch", "vendor", s.Name(), "batch_size", len(products), "total_so_far", current)

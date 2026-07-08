@@ -21,11 +21,18 @@ type Config struct {
 	ScrapeConcurrencyAWS   int
 	ScrapeConcurrencyAzure int
 	ScrapeConcurrencyGCP   int
-	LogLevel          string
-	MaxRequestBodyMB  int
-	MaxBatchSize      int
-	QueryTimeoutSecs  int
-	RateLimitPerSec   int
+	// EnablePriceSnapshots controls whether each scrape appends a full
+	// per-product row to price_snapshots. Default false: the snapshot table
+	// is an append-only audit trail with no reader (nothing queries it, the
+	// GraphQL API only exposes products), and writing one row per product per
+	// run made it grow unbounded and fill the disk. Off unless explicitly
+	// enabled via ENABLE_PRICE_SNAPSHOTS.
+	EnablePriceSnapshots bool
+	LogLevel             string
+	MaxRequestBodyMB     int
+	MaxBatchSize         int
+	QueryTimeoutSecs     int
+	RateLimitPerSec      int
 	// H9: maximum GraphQL query selection depth. Guards against deeply nested
 	// abuse queries (e.g. 100-deep aliased chains). Override via MAX_QUERY_DEPTH.
 	MaxQueryDepth int
@@ -52,27 +59,28 @@ type Config struct {
 
 func Load() *Config {
 	return &Config{
-		Port:                 getEnv("PORT", "4000"),
-		DatabaseURL:          getEnv("DATABASE_URL", ""),
-		APIKey:               getEnv("API_KEY", ""),
-		GCPAPIKey:            getEnv("GCP_API_KEY", ""),
+		Port:                   getEnv("PORT", "4000"),
+		DatabaseURL:            getEnv("DATABASE_URL", ""),
+		APIKey:                 getEnv("API_KEY", ""),
+		GCPAPIKey:              getEnv("GCP_API_KEY", ""),
 		ScrapeConcurrency:      getEnvInt("SCRAPE_CONCURRENCY", 4),
 		ScrapeConcurrencyAWS:   getEnvInt("SCRAPE_CONCURRENCY_AWS", 0),
 		ScrapeConcurrencyAzure: getEnvInt("SCRAPE_CONCURRENCY_AZURE", 8),
 		ScrapeConcurrencyGCP:   getEnvInt("SCRAPE_CONCURRENCY_GCP", 0),
-		LogLevel:             getEnv("LOG_LEVEL", "info"),
-		MaxRequestBodyMB:     getEnvInt("MAX_REQUEST_BODY_MB", 4),
-		MaxBatchSize:         getEnvInt("MAX_BATCH_SIZE", 100),
-		QueryTimeoutSecs:     getEnvInt("QUERY_TIMEOUT_SECS", 30),
-		RateLimitPerSec:      getEnvInt("RATE_LIMIT_PER_SEC", 100),
-		MaxQueryDepth:        getEnvInt("MAX_QUERY_DEPTH", 10),
-		DisableIntrospection: getEnvBool("DISABLE_INTROSPECTION", false),
-		CNYUSDRate:           getEnvFloat("CNY_USD_RATE", 6.2069),
-		CORSOrigins:         getEnv("CORS_ALLOWED_ORIGINS", ""),
-		DBMaxConns:           getEnvInt("DB_MAX_CONNS", 0),
-		DBMinConns:           getEnvInt("DB_MIN_CONNS", 0),
-		Env:                  getEnv("ENV", "development"),
-		MetricsPort:          getEnv("METRICS_PORT", ""),
+		EnablePriceSnapshots:   getEnvBool("ENABLE_PRICE_SNAPSHOTS", false),
+		LogLevel:               getEnv("LOG_LEVEL", "info"),
+		MaxRequestBodyMB:       getEnvInt("MAX_REQUEST_BODY_MB", 4),
+		MaxBatchSize:           getEnvInt("MAX_BATCH_SIZE", 100),
+		QueryTimeoutSecs:       getEnvInt("QUERY_TIMEOUT_SECS", 30),
+		RateLimitPerSec:        getEnvInt("RATE_LIMIT_PER_SEC", 100),
+		MaxQueryDepth:          getEnvInt("MAX_QUERY_DEPTH", 10),
+		DisableIntrospection:   getEnvBool("DISABLE_INTROSPECTION", false),
+		CNYUSDRate:             getEnvFloat("CNY_USD_RATE", 6.2069),
+		CORSOrigins:            getEnv("CORS_ALLOWED_ORIGINS", ""),
+		DBMaxConns:             getEnvInt("DB_MAX_CONNS", 0),
+		DBMinConns:             getEnvInt("DB_MIN_CONNS", 0),
+		Env:                    getEnv("ENV", "development"),
+		MetricsPort:            getEnv("METRICS_PORT", ""),
 	}
 }
 
@@ -126,7 +134,6 @@ type configError struct {
 func errMissingConfig(field string) error {
 	return &configError{field: field}
 }
-
 
 // ConcurrencyForVendor returns the effective scrape concurrency for a vendor.
 // It honors per-vendor overrides (SCRAPE_CONCURRENCY_{AWS,AZURE,GCP}) and falls
