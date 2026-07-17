@@ -28,7 +28,7 @@ services:
       SCRAPE_CONCURRENCY: ${SCRAPE_CONCURRENCY:-4}
       MAX_BATCH_SIZE: ${MAX_BATCH_SIZE:-500}
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"  # localhost only; Caddy reverse-proxies /graphql. Not publicly exposed.
     depends_on:
       db:
         condition: service_healthy
