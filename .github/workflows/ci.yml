@@ -11,6 +11,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege: CI only reads the repo. The release workflow declares its
+# own (broader) permissions separately.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest

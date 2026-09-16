@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"log/slog"
+	"math"
 	"time"
 
 	"github.com/exaring/otelpgx"
@@ -42,11 +43,13 @@ func New(ctx context.Context, databaseURL string, opts ...PoolOptions) (*DB, err
 
 	if len(opts) > 0 {
 		o := opts[0]
-		if o.MaxConns > 0 {
-			config.MaxConns = int32(o.MaxConns) //nolint:gosec // value range validated by config
+		// Bound before narrowing to int32 (pgxpool's type) so an absurd
+		// configured value can't overflow into a negative pool size.
+		if o.MaxConns > 0 && o.MaxConns <= math.MaxInt32 {
+			config.MaxConns = int32(o.MaxConns)
 		}
-		if o.MinConns > 0 {
-			config.MinConns = int32(o.MinConns) //nolint:gosec // value range validated by config
+		if o.MinConns > 0 && o.MinConns <= math.MaxInt32 {
+			config.MinConns = int32(o.MinConns)
 		}
 	}
 
@@ -82,8 +85,6 @@ func (d *DB) RunMigrations(ctx context.Context) error {
 	slog.Info("schema applied")
 	return nil
 }
-
-
 
 func (d *DB) PingCtx(ctx context.Context) error {
 	return d.Pool.Ping(ctx)
