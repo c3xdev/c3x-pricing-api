@@ -1,6 +1,10 @@
 services:
   db:
     image: postgres:16-alpine
+    # Without this, a Docker daemon restart / host reboot / package upgrade
+    # leaves db stopped while api (restart: unless-stopped) crash-loops on the
+    # missing hostname — a full outage. Keep db's policy in sync with api's.
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-c3x}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
