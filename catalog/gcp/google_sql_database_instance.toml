@@ -47,6 +47,13 @@ attribute_filters = [
   { key = "description", const = "Cloud SQL for PostgreSQL: Zonal - Micro instance in Americas" },
 ]
 
+[mappings.small]
+service        = "Cloud SQL"
+product_family = "ApplicationServices"
+attribute_filters = [
+  { key = "description", const = "Cloud SQL for PostgreSQL: Zonal - Small instance in Americas" },
+]
+
 [mappings.storage]
 service        = "Cloud SQL"
 product_family = "ApplicationServices"
@@ -68,6 +75,14 @@ unit     = "hours"
 when     = 'default(default(settings_tier, tier), "db-f1-micro") == "db-f1-micro"'
 quantity = "monthly_hours()"
 rate     = 'price("micro")'
+
+[[dimensions]]
+id       = "compute_small"
+label    = "Database compute (g1-small)"
+unit     = "hours"
+when     = 'default(default(settings_tier, tier), "db-f1-micro") == "db-g1-small"'
+quantity = "monthly_hours()"
+rate     = 'price("small")'
 
 [[dimensions]]
 id       = "vcpu"
