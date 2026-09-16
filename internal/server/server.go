@@ -176,6 +176,12 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/health", instrument("readyz", s.handleReadiness)) // backward compat
 	mux.HandleFunc("/status", instrument("status", s.handleStatus))
 	mux.HandleFunc("/catalog", instrument("catalog", handleCatalog))
+	// Root handler. ServeMux uses "/" as a catch-all for any path not
+	// matched above, so this also covers unknown paths. It answers "/"
+	// with a 200 and X-Robots-Tag: noindex (so a search engine that
+	// indexed the bare host recrawls, sees the noindex, and drops it)
+	// and returns 404 for everything else.
+	mux.HandleFunc("/", instrument("root", s.handleRoot))
 
 	// Serve /metrics on a separate admin port if configured, otherwise on the main mux.
 	if s.cfg.MetricsPort != "" && s.cfg.MetricsPort != "0" {
@@ -261,6 +267,26 @@ func (s *Server) handleLiveness(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleStatus returns the current scrape status and product counts per vendor.
+// handleRoot answers the bare host. Registered on "/", it is the
+// ServeMux catch-all, so it must 404 anything that is not exactly "/".
+// For "/" it returns a small text pointer to the docs and the GraphQL
+// endpoint, with X-Robots-Tag: noindex so search engines do not index
+// the API host.
+func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Robots-Tag", "noindex")
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.WriteString(w, "c3x pricing API. Docs: https://c3x.dev/docs/self-hosted/  Query endpoint: POST /graphql\n")
+}
+
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.WriteHeader(http.StatusMethodNotAllowed)
