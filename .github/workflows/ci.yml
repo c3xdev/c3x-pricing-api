@@ -39,7 +39,11 @@ jobs:
 
       - name: Run govulncheck
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          # govulncheck@latest can require a newer Go toolchain than the
+          # pinned project build (v1.8.0 needs Go 1.26). Allow the tool
+          # install to fetch the toolchain it needs; the scan below still
+          # analyzes the project with the pinned Go.
+          GOTOOLCHAIN=auto go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
 
       - name: Run golangci-lint
