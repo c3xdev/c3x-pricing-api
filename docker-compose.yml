@@ -27,6 +27,9 @@ services:
       GCP_API_KEY: ${GCP_API_KEY:-}
       SCRAPE_CONCURRENCY: ${SCRAPE_CONCURRENCY:-4}
       MAX_BATCH_SIZE: ${MAX_BATCH_SIZE:-500}
+      # Behind Cloudflare: trust the CF edge so rate limiting keys on the
+      # real client IP (CF-Connecting-IP) rather than the shared edge IP.
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
     ports:
       - "127.0.0.1:4000:4000"  # localhost only; Caddy reverse-proxies /graphql. Not publicly exposed.
     depends_on:
