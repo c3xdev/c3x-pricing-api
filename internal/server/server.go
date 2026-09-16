@@ -176,7 +176,7 @@ func (s *Server) Start() error {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/graphql", instrument("graphql",
-		requestIDMiddleware(recoverMiddleware(s.rateLimitMiddleware(s.authMiddleware(s.handleGraphQL))))))
+		s.requestIDMiddleware(recoverMiddleware(s.rateLimitMiddleware(s.authMiddleware(s.handleGraphQL))))))
 	mux.HandleFunc("/healthz", instrument("healthz", s.handleLiveness))
 	mux.HandleFunc("/readyz", instrument("readyz", s.handleReadiness))
 	mux.HandleFunc("/health", instrument("readyz", s.handleReadiness)) // backward compat
@@ -850,7 +850,7 @@ func recoverMiddleware(next http.HandlerFunc) http.HandlerFunc {
 // an incoming X-Request-ID header) and logs structured request metadata.
 // T4: validates incoming X-Request-ID against a strict regex to prevent log injection.
 // T5: handles rand.Read errors with a UnixNano fallback.
-func requestIDMiddleware(next http.HandlerFunc) http.HandlerFunc {
+func (s *Server) requestIDMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqID := r.Header.Get("X-Request-ID")
 		if reqID == "" || !validRequestID.MatchString(reqID) {
@@ -870,10 +870,10 @@ func requestIDMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		// O15: Redact credential-bearing query parameters from access logs.
 		sanitizedPath := redactSensitiveParams(r.URL.RequestURI())
 
-		ip := r.RemoteAddr
-		if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
-			ip = host
-		}
+		// Log the real client IP (same value the rate limiter keys on):
+		// CF-Connecting-IP / X-Forwarded-For when the peer is a trusted proxy,
+		// else RemoteAddr. Without this the log always shows the local proxy hop.
+		ip := s.clientIP(r)
 
 		slog.Info("request", //nolint:gosec // G706: structured logging with sanitized path, no injection risk
 			"method", r.Method,
