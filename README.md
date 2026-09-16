@@ -80,7 +80,7 @@ table.
 | `MAX_QUERY_DEPTH` | `10` | Maximum GraphQL query nesting depth |
 | `RATE_LIMIT_PER_SEC` | `100` | Maximum requests per second per IP |
 | `CORS_ALLOWED_ORIGINS` | *(empty)* | Comma-separated allowed CORS origins. `*` = all |
-| `TRUSTED_PROXIES` | *(empty)* | Comma-separated CIDRs/IPs for X-Forwarded-For trust |
+| `TRUSTED_PROXIES` | *(empty)* | Comma-separated CIDRs/IPs whose `CF-Connecting-IP` / `X-Forwarded-For` is trusted for the real client IP (used by rate limiting and metrics). Use the literal `cloudflare` to trust Cloudflare's published edge ranges. Behind Cloudflare, set this or rate limiting keys on the Cloudflare edge IP. |
 | `DISABLE_INTROSPECTION` | `false` | Block GraphQL introspection queries |
 | `DB_MAX_CONNS` | `0` | Max database pool connections (0 = pgx default) |
 | `DB_MIN_CONNS` | `0` | Min database pool connections (0 = pgx default) |
