@@ -20,7 +20,7 @@ func TestAuthMiddleware_NoAPIKey(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequestWithContext(context.Background(),"GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 	w := httptest.NewRecorder()
 	handler(w, req)
 
@@ -37,7 +37,7 @@ func TestAuthMiddleware_ValidBearerToken(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequestWithContext(context.Background(),"GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 	req.Header.Set("Authorization", "Bearer test-secret-key")
 	w := httptest.NewRecorder()
 	handler(w, req)
@@ -55,7 +55,7 @@ func TestAuthMiddleware_ValidXApiKey(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequestWithContext(context.Background(),"GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 	req.Header.Set("X-Api-Key", "test-secret-key")
 	w := httptest.NewRecorder()
 	handler(w, req)
@@ -73,7 +73,7 @@ func TestAuthMiddleware_InvalidKey(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequestWithContext(context.Background(),"GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 	req.Header.Set("X-Api-Key", "wrong-key")
 	w := httptest.NewRecorder()
 	handler(w, req)
@@ -91,7 +91,7 @@ func TestAuthMiddleware_NoKey(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequestWithContext(context.Background(),"GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 	w := httptest.NewRecorder()
 	handler(w, req)
 
@@ -108,7 +108,7 @@ func TestRateLimitMiddleware_UnderLimit(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequestWithContext(context.Background(),"GET", "/test", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 	w := httptest.NewRecorder()
 	handler(w, req)
 
@@ -129,7 +129,7 @@ func TestRateLimitMiddleware_OverLimit(t *testing.T) {
 	// subsequent ones within the same second are limited.
 	okCount, limitedCount := 0, 0
 	for i := 0; i < 10; i++ {
-		req := httptest.NewRequestWithContext(context.Background(),"GET", "/test", nil)
+		req := httptest.NewRequestWithContext(context.Background(), "GET", "/test", nil)
 		w := httptest.NewRecorder()
 		handler(w, req)
 		switch w.Code {
@@ -152,7 +152,7 @@ func TestGraphQL_MethodNotAllowed(t *testing.T) {
 	cfg := &config.Config{APIKey: "", MaxRequestBodyMB: 1, MaxBatchSize: 100, QueryTimeoutSecs: 30, RateLimitPerSec: 100}
 	s := &Server{cfg: cfg, rateLimiters: make(map[string]*list.Element), rateLRU: list.New()}
 
-	req := httptest.NewRequestWithContext(context.Background(),"GET", "/graphql", nil)
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/graphql", nil)
 	w := httptest.NewRecorder()
 	s.handleGraphQL(w, req)
 
@@ -166,7 +166,7 @@ func TestGraphQL_BatchTooLarge(t *testing.T) {
 	s := &Server{cfg: cfg, rateLimiters: make(map[string]*list.Element), rateLRU: list.New()}
 
 	body := `[{"query":"{ __typename }"},{"query":"{ __typename }"},{"query":"{ __typename }"}]`
-	req := httptest.NewRequestWithContext(context.Background(),"POST", "/graphql", strings.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), "POST", "/graphql", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	s.handleGraphQL(w, req)
@@ -202,5 +202,28 @@ func TestConfigValidation_Valid(t *testing.T) {
 	err := cfg.Validate()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestHandleRoot(t *testing.T) {
+	s := &Server{cfg: &config.Config{}, rateLimiters: make(map[string]*list.Element), rateLRU: list.New()}
+
+	// "/" returns 200 with a noindex header.
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/", nil)
+	w := httptest.NewRecorder()
+	s.handleRoot(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("GET / = %d, want 200", w.Code)
+	}
+	if got := w.Header().Get("X-Robots-Tag"); got != "noindex" {
+		t.Errorf("X-Robots-Tag = %q, want noindex", got)
+	}
+
+	// An unknown path still 404s (the "/" pattern is a catch-all).
+	req = httptest.NewRequestWithContext(context.Background(), "GET", "/nope", nil)
+	w = httptest.NewRecorder()
+	s.handleRoot(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("GET /nope = %d, want 404", w.Code)
 	}
 }
