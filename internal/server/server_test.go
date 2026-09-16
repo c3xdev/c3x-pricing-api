@@ -227,3 +227,39 @@ func TestHandleRoot(t *testing.T) {
 		t.Errorf("GET /nope = %d, want 404", w.Code)
 	}
 }
+
+func TestCloudflareNetworks_AllParse(t *testing.T) {
+	nets := cloudflareNetworks()
+	if len(nets) != len(cloudflareCIDRStrings) {
+		t.Fatalf("parsed %d of %d Cloudflare CIDRs (a constant is malformed)", len(nets), len(cloudflareCIDRStrings))
+	}
+}
+
+func TestClientIP_TrustedCloudflareProxy(t *testing.T) {
+	s := &Server{cfg: &config.Config{}, trustedProxies: cloudflareNetworks()}
+
+	// From a Cloudflare edge IP: prefer CF-Connecting-IP.
+	req := httptest.NewRequestWithContext(context.Background(), "GET", "/", nil)
+	req.RemoteAddr = "162.158.1.1:40000" // inside 162.158.0.0/15
+	req.Header.Set("CF-Connecting-IP", "203.0.113.7")
+	req.Header.Set("X-Forwarded-For", "203.0.113.7, 162.158.1.1")
+	if got := s.clientIP(req); got != "203.0.113.7" {
+		t.Errorf("trusted CF: clientIP = %q, want 203.0.113.7", got)
+	}
+
+	// Falls back to X-Forwarded-For[0] when CF-Connecting-IP is absent.
+	req2 := httptest.NewRequestWithContext(context.Background(), "GET", "/", nil)
+	req2.RemoteAddr = "172.64.0.5:40000" // inside 172.64.0.0/13
+	req2.Header.Set("X-Forwarded-For", "198.51.100.9, 172.64.0.5")
+	if got := s.clientIP(req2); got != "198.51.100.9" {
+		t.Errorf("XFF fallback: clientIP = %q, want 198.51.100.9", got)
+	}
+
+	// An untrusted peer must NOT be able to spoof its IP via headers.
+	req3 := httptest.NewRequestWithContext(context.Background(), "GET", "/", nil)
+	req3.RemoteAddr = "8.8.8.8:40000" // not a Cloudflare range
+	req3.Header.Set("CF-Connecting-IP", "1.2.3.4")
+	if got := s.clientIP(req3); got != "8.8.8.8" {
+		t.Errorf("untrusted peer: clientIP = %q, want the real peer 8.8.8.8 (no header spoofing)", got)
+	}
+}

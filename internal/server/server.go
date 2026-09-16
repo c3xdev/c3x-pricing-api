@@ -92,6 +92,12 @@ func New(cfg *config.Config, database *db.DB) (*Server, error) {
 	if tp := os.Getenv("TRUSTED_PROXIES"); tp != "" {
 		for _, entry := range strings.Split(tp, ",") {
 			entry = strings.TrimSpace(entry)
+			if strings.EqualFold(entry, "cloudflare") {
+				// Convenience: expand to Cloudflare's published edge ranges
+				// so operators behind Cloudflare need not paste ~20 CIDRs.
+				s.trustedProxies = append(s.trustedProxies, cloudflareNetworks()...)
+				continue
+			}
 			if _, network, err := net.ParseCIDR(entry); err == nil {
 				s.trustedProxies = append(s.trustedProxies, network)
 			} else if ip := net.ParseIP(entry); ip != nil {
@@ -590,6 +596,13 @@ func (s *Server) clientIP(r *http.Request) string {
 		}
 	}
 	if trusted {
+		// Cloudflare's canonical client header is the most reliable and is
+		// set only by Cloudflare; prefer it, then fall back to the first
+		// X-Forwarded-For hop. Both are only honoured because the immediate
+		// peer (RemoteAddr) is a trusted proxy.
+		if cf := strings.TrimSpace(r.Header.Get("CF-Connecting-IP")); cf != "" {
+			return cf
+		}
 		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
 			return strings.TrimSpace(strings.Split(fwd, ",")[0])
 		}
