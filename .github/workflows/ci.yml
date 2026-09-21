@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25.13'
+          go-version: '1.27.1'
 
       - name: Verify go.mod integrity
         run: go mod verify
@@ -44,10 +44,10 @@ jobs:
 
       - name: Run govulncheck
         run: |
-          # govulncheck@latest can require a newer Go toolchain than the
-          # pinned project build (v1.8.0 needs Go 1.26). Allow the tool
-          # install to fetch the toolchain it needs; the scan below still
-          # analyzes the project with the pinned Go.
+          # govulncheck@latest tracks the newest Go, so it can require a
+          # toolchain newer than this project's pin. Let the tool install
+          # fetch whatever it needs; the scan below still analyzes the
+          # project with the pinned Go.
           GOTOOLCHAIN=auto go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
 
