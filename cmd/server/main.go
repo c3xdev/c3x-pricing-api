@@ -6,8 +6,10 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -140,15 +142,39 @@ func scrapeCmd() *cobra.Command {
 
 			// Run vendor scrapes concurrently. Each vendor acquires its own
 			// advisory lock, so parallel runs of different vendors are safe.
+			var (
+				mu    sync.Mutex
+				empty []string
+			)
 			g, gctx := errgroup.WithContext(ctx)
 			for _, s := range scrapers {
 				s := s
 				g.Go(func() error {
-					return runOneScrape(gctx, database, s, cfg.EnablePriceSnapshots)
+					ok, err := runOneScrape(gctx, database, s, cfg.EnablePriceSnapshots)
+					if err != nil {
+						return err
+					}
+					if !ok {
+						mu.Lock()
+						empty = append(empty, strings.ToLower(s.Name()))
+						mu.Unlock()
+					}
+					return nil
 				})
 			}
 			if err := g.Wait(); err != nil {
 				return err
+			}
+
+			// Fail the command when a vendor ingested nothing, so cron and CI
+			// surface it instead of reporting a green run over stale data.
+			// The run itself is already recorded as failed; collecting the
+			// vendors here (rather than returning early) means one broken
+			// vendor does not cancel the others mid-scrape.
+			if len(empty) > 0 {
+				sort.Strings(empty)
+				return fmt.Errorf("scrape ingested 0 products for: %s (recorded as failed; check credentials and logs)",
+					strings.Join(empty, ", "))
 			}
 
 			return nil
@@ -159,32 +185,59 @@ func scrapeCmd() *cobra.Command {
 	return cmd
 }
 
+// emptyScrapeError returns the error to record for a run that ingested no
+// products, or nil when the run produced data.
+//
+// No vendor legitimately has zero priced products, so an empty run always
+// means something is broken: a revoked or invalid API key, a changed
+// upstream API, or a network failure. Per-service errors are swallowed on
+// purpose (one flaky service must not abort a whole vendor), so an empty
+// run is frequently the only signal that every service failed, and
+// marking it 'success' hides the outage behind a green row in
+// scrape_runs for as long as nobody eyeballs the product counts.
+func emptyScrapeError(products int, failedServices int64) error {
+	if products > 0 {
+		return nil
+	}
+	if failedServices > 0 {
+		return fmt.Errorf("scrape ingested 0 products and %d service(s) failed: "+
+			"check the vendor credentials and upstream API", failedServices)
+	}
+	return fmt.Errorf("scrape ingested 0 products: check the vendor credentials and upstream API")
+}
+
 // runOneScrape executes a single vendor's scrape run under a pg advisory lock,
-// records its progress in scrape_runs, and updates stale row counts. It returns
-// an error only for unrecoverable problems; per-service errors within a scraper
-// are logged and the run is marked 'success' with whatever products came back,
-// which matches the existing partial-data semantics.
-func runOneScrape(ctx context.Context, database *db.DB, s scraper.Scraper, recordSnapshots bool) error {
+// records its progress in scrape_runs, and updates stale row counts.
+//
+// The returned bool reports whether the run produced data. A run that
+// ingested nothing is recorded as 'failed' and returns (false, nil): the
+// nil error is deliberate, since vendors share an errgroup context and a
+// returned error would cancel the other vendors' in-flight scrapes. The
+// caller aggregates the false results and fails the command afterwards.
+// A non-nil error is reserved for unrecoverable problems (lock, database).
+// Per-service errors within a scraper stay logged-and-swallowed, so a run
+// with partial data is still 'success', matching the existing semantics.
+func runOneScrape(ctx context.Context, database *db.DB, s scraper.Scraper, recordSnapshots bool) (bool, error) {
 	vendorName := strings.ToLower(s.Name())
 
 	locked, unlock, err := database.AcquireScrapeLock(ctx, vendorName)
 	if err != nil {
-		return fmt.Errorf("acquire scrape lock for %s: %w", s.Name(), err)
+		return false, fmt.Errorf("acquire scrape lock for %s: %w", s.Name(), err)
 	}
 	if !locked {
 		slog.Warn("another scrape is already running for this vendor; skipping", "vendor", s.Name())
-		return nil
+		return true, nil
 	}
 	defer unlock()
 
 	var scrapeStart time.Time
 	if err := database.Pool.QueryRow(ctx, "SELECT now()").Scan(&scrapeStart); err != nil {
-		return fmt.Errorf("failed to get DB time: %w", err)
+		return false, fmt.Errorf("failed to get DB time: %w", err)
 	}
 
 	runID, err := database.StartScrapeRun(ctx, vendorName, scrapeStart)
 	if err != nil {
-		return fmt.Errorf("start scrape run record: %w", err)
+		return false, fmt.Errorf("start scrape run record: %w", err)
 	}
 
 	slog.Info("scraping pricing data", "vendor", s.Name(), "run_id", runID)
@@ -210,7 +263,7 @@ func runOneScrape(ctx context.Context, database *db.DB, s scraper.Scraper, recor
 
 	if err := s.ScrapeWithHandler(ctx, handler); err != nil {
 		_ = database.FinishScrapeRun(context.Background(), runID, "failed", int(totalProducts), 0, err)
-		return fmt.Errorf("scrape %s failed: %w", s.Name(), err)
+		return false, fmt.Errorf("scrape %s failed: %w", s.Name(), err)
 	}
 
 	// Consistency guards: only delete stale products when the scrape is complete
@@ -228,6 +281,23 @@ func runOneScrape(ctx context.Context, database *db.DB, s scraper.Scraper, recor
 	var deleted int64
 	currentCount := int(atomic.LoadInt64(&totalProducts))
 
+	// An empty scrape is a failure, and has to be checked before the
+	// cleanup switch below: per-service errors are deliberately swallowed
+	// so one flaky service can't abort a run, which means a wholly broken
+	// credential surfaces here as "every service failed, zero products"
+	// rather than as a returned error. Recording that as success is what
+	// let a dead GCP key sit unnoticed for a month.
+	if emptyErr := emptyScrapeError(currentCount, failedSvcs); emptyErr != nil {
+		slog.Error("scrape produced zero products, recording run as failed",
+			"vendor", s.Name(), "failed_services", failedSvcs, "run_id", runID)
+		if ferr := database.FinishScrapeRun(ctx, runID, "failed", 0, 0, emptyErr); ferr != nil {
+			slog.Warn("failed to record scrape failure", "vendor", s.Name(), "run_id", runID, "error", ferr)
+		}
+		// Deliberately no SetScrapeLastSuccess: freshness must not
+		// advance on a run that ingested nothing.
+		return false, nil
+	}
+
 	switch {
 	case failedSvcs > 0:
 		slog.Warn("some services failed during scrape, skipping stale cleanup to preserve their data",
@@ -235,8 +305,6 @@ func runOneScrape(ctx context.Context, database *db.DB, s scraper.Scraper, recor
 	case prevCount > 0 && currentCount < prevCount/2:
 		slog.Error("scrape produced significantly fewer products than previous run, skipping stale cleanup",
 			"vendor", s.Name(), "current", currentCount, "previous", prevCount)
-	case currentCount == 0:
-		slog.Warn("scrape produced zero products, skipping stale cleanup", "vendor", s.Name())
 	default:
 		var err error
 		deleted, err = database.DeleteStaleProducts(ctx, vendorName, scrapeStart)
@@ -262,7 +330,7 @@ func runOneScrape(ctx context.Context, database *db.DB, s scraper.Scraper, recor
 	}
 
 	slog.Info("scrape complete", "vendor", s.Name(), "products", totalProducts, "deleted", deleted)
-	return nil
+	return true, nil
 }
 
 // scrapeRunRetention returns the retention window for scrape_runs rows.
