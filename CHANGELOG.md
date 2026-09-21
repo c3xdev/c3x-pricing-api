@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-09-21
+
+### Fixed
+- A scrape that ingested zero products is recorded as `failed` instead
+  of `success`, does not advance the last-success freshness gauge, and
+  makes `scrape` exit non-zero so cron and CI surface it. Per-service
+  errors are swallowed by design, so a wholly invalid credential
+  previously surfaced only as "every service failed, zero products" and
+  was still written to `scrape_runs` as a green row; an invalid GCP key
+  went unnoticed for over a month that way. The existing zero-product
+  guard sat after the failed-services case in the cleanup switch and so
+  never ran in exactly that scenario. Partial data is still a success,
+  and an empty run still skips stale-product cleanup so the previous
+  catalog is preserved. An empty vendor no longer cancels its siblings'
+  in-flight scrapes. (#52)
+
+## [1.1.2] - 2026-09-16
+
+### Fixed
+- Bound `DB_MAX_CONNS` / `DB_MIN_CONNS` with `<= math.MaxInt32` before
+  narrowing to pgxpool's `int32`, so an absurd configured pool size
+  cannot overflow into a negative value. (#46)
+
+### Security
+- Least-privilege `permissions: contents: read` on the CI workflow. (#46)
+- Enabled CodeQL default-setup scanning on the repository.
+
+## [1.1.1] - 2026-09-16
+
+### Fixed
+- The `db` service has `restart: unless-stopped`, matching `api`. A
+  Docker daemon restart previously left Postgres stopped while the API
+  crash-looped on `lookup db: no such host`, taking the endpoint down
+  until it was started by hand. (#44)
+
+### Changed
+- Dependency bumps: testcontainers 0.44.0, OpenTelemetry 1.45 / contrib
+  0.70, prometheus/client_golang 1.24.1. (#45)
+
+## [1.1.0] - 2026-09-16
+
+### Added
+- `TRUSTED_PROXIES` accepts the literal `cloudflare`, expanding to
+  Cloudflare's published edge ranges. (#40)
+- `/` answers 200 with `X-Robots-Tag: noindex` instead of 404, so the
+  public endpoint stops reporting a broken root to search engines. (#39)
+
+### Security
+- Rate limiting and metrics key on the real client IP: `clientIP` prefers
+  `CF-Connecting-IP`, then the first `X-Forwarded-For` hop, and only when
+  the immediate peer is a trusted proxy. Behind Cloudflare every request
+  previously counted against the shared edge IP, so per-client limits
+  were not being enforced. (#40, #41)
+- Patched 9 known vulnerabilities: Go 1.25.13 (6 stdlib CVEs), grpc
+  v1.83.1, x/text v0.39.0. The release workflow builds with the same
+  pinned Go as CI and the Dockerfile. (#43)
+- Bind the API to `127.0.0.1` rather than `0.0.0.0`. (#32)
+
+### Fixed
+- Access logs record the real client IP instead of the local proxy
+  hop. (#42)
+- Cloud SQL `db-g1-small` tier is priced. (#31)
+- Corrected DNS query, ACI and Digital Twins over-pricing; completed the
+  priced long tail at 1,340 recognized kinds.
+
+### Changed
+- `price_snapshots` recording is gated behind `ENABLE_PRICE_SNAPSHOTS`
+  and off by default: the table had no reader and grew unbounded.
+
 ## [1.0.4] - 2026-06-09
 
 ### Added
