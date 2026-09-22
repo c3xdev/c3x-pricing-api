@@ -33,6 +33,14 @@ attribute_filters = [
       "Aurora PostgreSQL")
   ''' },
   { key = "deploymentOption", const = "Single-AZ" },
+  # DELIBERATELY not linked(): this catalog is served to every c3x
+  # client, including versions whose expression engine predates that
+  # function, and an unknown function would fail the filter outright.
+  # The c3x repo's embedded copy does use linked() to read storage_type
+  # off the parent cluster, which is safe there because an embedded
+  # catalog is only ever read by the binary it ships inside. Switching
+  # this copy over needs a catalog schema_version bump so older clients
+  # fall back instead of breaking.
   { key = "storage", expr = '''
       pick(default(storage_type, "") == "aurora-iopt1",
       "Aurora IO Optimization Mode", "EBS Only")
