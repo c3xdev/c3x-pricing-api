@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-09-22
+
+### Fixed
+- Aurora clusters were priced at the I/O-Optimized rate whether or not
+  they used it. The two instance SKUs per class share `instanceType`,
+  `databaseEngine` and `deploymentOption`, which was all the mapping
+  filtered on, so both matched and the max-non-zero picker took the
+  dearer one: a `db.r6g.large` priced at $246.74/mo instead of $189.80,
+  a ~30% overcharge on Aurora Standard. Instances now discriminate on
+  the `storage` attribute and cluster storage follows `storage_type`.
+  (c3xdev/c3x#68)
+- Aurora I/O was priced at zero everywhere except us-east-1: the
+  `usagetype` pin `Aurora:StorageIOUsage` never matches the
+  region-prefixed `EU-Aurora:StorageIOUsage` upstream. Pin removed.
+- Aurora I/O is no longer billed on `aurora-iopt1` clusters, where it is
+  included in the storage rate.
+- `/status` no longer reports a vendor `ready` when it has no data. It
+  derived readiness from the newest successful run and never downgraded
+  it, so a vendor whose credential is revoked kept answering `ready`
+  with `products: 0` indefinitely, the same silent failure the scraper
+  was fixed to stop in 1.1.3. Two states are new: `failed` (the most
+  recent run failed, served data is frozen) and `empty` (the last
+  successful run ingested nothing). The status vocabulary is now
+  documented in the README. Serving is unaffected. (#56)
+
+### Changed
+- Go 1.27.1 across CI, release and the Docker image. Go 1.25 went end of
+  life when 1.27 shipped, so the pinned toolchain no longer received
+  security fixes. This also unblocked `golang.org/x/time` 0.16.0, which
+  requires go 1.26. (#54)
+- Dependency bumps: OpenTelemetry 1.46 / contrib 0.70, pgx 5.11,
+  otelpgx 0.12, prometheus/client_golang 1.24.1. (#53)
+
 ## [1.1.3] - 2026-09-21
 
 ### Fixed
