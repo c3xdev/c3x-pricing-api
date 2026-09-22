@@ -45,10 +45,29 @@ c3x estimate --path /path/to/terraform
 | Endpoint | Method | Description |
 |---|---|---|
 | `/graphql` | POST | GraphQL pricing queries (supports batched requests) |
-| `/status`  | GET | Scrape status and product counts per vendor (JSON) |
+| `/status`  | GET | Scrape status and product counts per vendor (JSON). Per-vendor `status` is one of `ready`, `empty`, `failed`, `stale`, `scraping`, `never`; see below. |
 | `/healthz` | GET | Liveness probe, no DB dependency |
 | `/readyz` | GET | Readiness probe, pings the DB |
 | `/health`  | GET | Backwards-compatible alias for `/readyz` |
+
+### Vendor status values
+
+`/status` reports one state per vendor, ordered by urgency so the most
+actionable one wins when several apply:
+
+| status | meaning |
+|---|---|
+| `ready` | fresh data from a run that actually ingested products |
+| `empty` | the last successful run ingested nothing, so it produced no usable data despite being recorded a success |
+| `failed` | the most recent run failed, so the served data is frozen at the previous run |
+| `stale` | nothing has finished in 48 hours |
+| `scraping` | a run is in flight |
+| `never` | no scrape has ever run for this vendor |
+
+`empty` and `failed` matter because a vendor with a revoked credential
+scrapes nothing while the API keeps serving the rows it already had. The
+data stays available and correct-as-of-its-last-good-scrape, but it stops
+advancing, and the status is what tells you so.
 
 ## Deploying
 

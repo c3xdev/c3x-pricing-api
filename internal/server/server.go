@@ -314,6 +314,18 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		"gcp":   {Status: "never"},
 	}
 
+	// Facts are gathered first and the status decided at the end. Deciding
+	// inline is what produced the bug this replaced: the vendor was marked
+	// "ready" off the last successful run, and nothing downgraded it, so a
+	// vendor whose scrapes had been failing daily still reported ready.
+	type facts struct {
+		sawSuccess      bool
+		successProducts int64
+		latestStatus    string // success | failed | running
+		finishedAt      *time.Time
+	}
+	seen := map[string]*facts{"aws": {}, "azure": {}, "gcp": {}}
+
 	// Use scrape_runs product counts instead of COUNT(*) on the products table
 	// (which takes 5+ seconds on 5M rows). The scrape_runs table records
 	// the product count at completion time.
@@ -326,9 +338,10 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 			var vendor string
 			var count int
 			if rows.Scan(&vendor, &count) == nil {
-				if v, ok := vendors[vendor]; ok {
-					v.Products = int64(count)
-					v.Status = "ready"
+				if fct, ok := seen[vendor]; ok {
+					fct.sawSuccess = true
+					fct.successProducts = int64(count)
+					vendors[vendor].Products = int64(count)
 					// Feed the Prometheus gauge whenever /status is
 					// polled — monitoring hits this endpoint anyway,
 					// so the gauge tracks reality without a dedicated
@@ -340,7 +353,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		rows.Close()
 	}
 
-	// Get latest scrape run status per vendor
+	// Latest run per vendor, whatever its outcome.
 	rows2, err := s.db.Pool.Query(ctx, `
 		SELECT DISTINCT ON (vendor) vendor, status, finished_at
 		FROM scrape_runs ORDER BY vendor, id DESC`)
@@ -350,21 +363,23 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 			var vendor, status string
 			var finishedAt *time.Time
 			if rows2.Scan(&vendor, &status, &finishedAt) == nil {
-				if v, ok := vendors[vendor]; ok {
-					if status == "running" {
-						v.Status = "scraping"
-					} else if finishedAt != nil {
-						v.LastScraped = finishedAt.Format(time.RFC3339)
+				if fct, ok := seen[vendor]; ok {
+					fct.latestStatus = status
+					fct.finishedAt = finishedAt
+					if finishedAt != nil {
+						vendors[vendor].LastScraped = finishedAt.Format(time.RFC3339)
 						if status == "success" {
 							SetScrapeLastSuccess(vendor, *finishedAt)
-						}
-						if time.Since(*finishedAt) > 48*time.Hour {
-							v.Status = "stale"
 						}
 					}
 				}
 			}
 		}
+	}
+
+	for vendor, fct := range seen {
+		vendors[vendor].Status = vendorStatus(
+			fct.sawSuccess, fct.successProducts, fct.latestStatus, fct.finishedAt)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -884,6 +899,44 @@ func (s *Server) requestIDMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			"ip", ip,
 		)
 	}
+}
+
+// vendorStatus reduces what is known about a vendor's scrape history to a
+// single reported state. Ordered by urgency, because a vendor can be
+// several of these at once and the most actionable one should win:
+//
+//	never     no scrape has ever run
+//	scraping  a run is in flight
+//	failed    the most recent run failed, so the served data is frozen
+//	empty     the last successful run ingested nothing, so there is no
+//	          usable data from it even though it was recorded a success
+//	stale     nothing has finished in 48 hours
+//	ready     fresh data from a run that actually ingested products
+//
+// "empty" and "failed" exist because the previous logic derived readiness
+// solely from the newest successful run and never downgraded it: a vendor
+// with a revoked credential kept reporting "ready" indefinitely, which is
+// the same silent failure the scraper itself was fixed to stop.
+func vendorStatus(sawSuccess bool, successProducts int64, latestStatus string, finishedAt *time.Time) string {
+	if latestStatus == "" && !sawSuccess {
+		return "never"
+	}
+	if latestStatus == "running" {
+		return "scraping"
+	}
+	if latestStatus == "failed" {
+		return "failed"
+	}
+	if !sawSuccess {
+		return "never"
+	}
+	if successProducts == 0 {
+		return "empty"
+	}
+	if finishedAt != nil && time.Since(*finishedAt) > 48*time.Hour {
+		return "stale"
+	}
+	return "ready"
 }
 
 // redactSensitiveParams removes credential-related query parameters from URLs before logging.
