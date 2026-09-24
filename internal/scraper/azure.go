@@ -154,84 +154,146 @@ func (s *AzureScraper) scrapeService(ctx context.Context, serviceName string) ([
 	filter := fmt.Sprintf("serviceName eq '%s'", escapedName)
 	pageURL := fmt.Sprintf("%s?$filter=%s", azureBaseURL, url.QueryEscape(filter))
 
-	productMap := make(map[string]*db.Product)
+	b := newAzureProductBuilder()
 
 	for pageURL != "" {
 		azureResp, err := s.fetchPage(ctx, pageURL)
 		if err != nil {
 			// L9: Return the error instead of swallowing it so the caller can
 			// decide whether to keep partial data.
-			slog.Warn("pagination error", "vendor", "azure", "service", serviceName, "products_so_far", len(productMap), "error", err)
-			return nil, fmt.Errorf("pagination error for %s after %d products: %w", serviceName, len(productMap), err)
+			slog.Warn("pagination error", "vendor", "azure", "service", serviceName, "products_so_far", b.count(), "error", err)
+			return nil, fmt.Errorf("pagination error for %s after %d products: %w", serviceName, b.count(), err)
 		}
-
 		for _, item := range azureResp.Items {
-			// Only filter by isPrimaryMeterRegion for services that use actual regions.
-			// Services using virtual regions (Zone 1, Global) often have isPrimaryMeterRegion=false
-			// for their relevant entries. Some product types (like IP Addresses) also have
-			// isPrimaryMeterRegion=false for region-specific items.
-			if !item.IsPrimaryMeterRegion && !usesVirtualRegions(item.ServiceName) && !skipPrimaryMeterFilter(item) {
-				continue
-			}
-
-			// Determine the regions to store this product under
-			regions := azureProductRegions(item)
-
-			// Normalize Azure VM product names by stripping version suffixes
-			// (e.g., "Virtual Machines DSv3 Series v8" → "Virtual Machines DSv3 Series").
-			// Azure recently added these suffixes but the pricing is identical and
-			// CLI filters expect the original format.
-			productName := normalizeAzureProductName(item.ProductName)
-
-			for _, region := range regions {
-				productKey := fmt.Sprintf("%s|%s|%s|%s", productName, item.SkuName, item.MeterName, region)
-				sku := ProductHash("azure-sku", productName, item.SkuName, item.MeterName)
-
-				if _, ok := productMap[productKey]; !ok {
-					prodHash := ProductHash("azure", region, item.ServiceName, sku+region)
-					productMap[productKey] = &db.Product{
-						ProductHash:   prodHash,
-						SKU:           sku,
-						VendorName:    "azure",
-						Region:        region,
-						Service:       item.ServiceName,
-						ProductFamily: item.ServiceFamily,
-						Attributes:    azureAttributes(item.ServiceName, productName, item.SkuName, item.MeterName, item.ArmSkuName, item.ServiceFamily),
-						Prices:        []db.Price{},
-					}
-				}
-
-				purchaseOption := item.Type
-
-				// Use tierMinimumUnits as startUsageAmount for tiered pricing
-				startUsageAmount := ""
-				if item.TierMinimumUnits > 0 {
-					startUsageAmount = fmt.Sprintf("%g", item.TierMinimumUnits)
-				} else {
-					startUsageAmount = "0"
-				}
-
-				priceH := PriceHash(productMap[productKey].ProductHash, purchaseOption, item.UnitOfMeasure, startUsageAmount, item.MeterName, item.ReservationTerm, "", "")
-
-				productMap[productKey].Prices = append(productMap[productKey].Prices, db.Price{
-					PriceHash:        priceH,
-					PurchaseOption:   purchaseOption,
-					Unit:             item.UnitOfMeasure,
-					USD:              fmt.Sprintf("%.10f", item.RetailPrice),
-					StartUsageAmount: startUsageAmount,
-					Description:      item.MeterName,
-					TermLength:       item.ReservationTerm,
-				})
-			}
+			b.add(item)
 		}
-
 		pageURL = azureResp.NextPageLink
 	}
 
-	// Deduplicate by product_hash and deduplicate prices within each product
+	return b.products(), nil
+}
+
+// azureProductBuilder folds Retail Prices API rows into products, one per
+// (productName, skuName, meterName, region).
+//
+// isPrimaryMeterRegion: Azure lists a meter under every region it is sold
+// in, but each meter (meterId) belongs to one primary region. The other
+// regions carry a non-primary copy of the same meterId at the same price;
+// Firewall's meters, for instance, are primary under "Global" and
+// re-listed under eastus, westeurope and the rest. Skipping non-primary
+// rows outright, as the scraper used to, left those regions with no row
+// at all for meters such as AKS "Standard Uptime SLA", Firewall
+// "Standard Data Processed" and Blob "Hot LRS Data Stored", and a
+// region-scoped query matched nothing.
+//
+// A non-primary row is therefore kept, but only to fill a gap: within one
+// product, a price slot (purchaseOption, unit, tier start, term) that
+// has a primary row keeps only the primary rows. A consumer that takes
+// the highest matching price can then never see a non-primary row next to
+// a primary one for the same slot, so no slot gains a second, differing
+// price, and every slot that was priced before is priced identically.
+type azureProductBuilder struct {
+	byKey map[string]*db.Product
+	// primary[productKey][i] reports whether Prices[i] came from a row
+	// that is authoritative for its slot.
+	primary map[string][]bool
+}
+
+func newAzureProductBuilder() *azureProductBuilder {
+	return &azureProductBuilder{
+		byKey:   make(map[string]*db.Product),
+		primary: make(map[string][]bool),
+	}
+}
+
+func (b *azureProductBuilder) count() int { return len(b.byKey) }
+
+// add folds one Retail Prices API row into the product map.
+func (b *azureProductBuilder) add(item azureItem) {
+	// Rows that were already kept unconditionally (virtual-region
+	// services and the skipPrimaryMeterFilter list) stay authoritative, so
+	// their output is unchanged.
+	authoritative := item.IsPrimaryMeterRegion || usesVirtualRegions(item.ServiceName) || skipPrimaryMeterFilter(item)
+
+	// Determine the regions to store this product under
+	regions := azureProductRegions(item)
+
+	// Normalize Azure VM product names by stripping version suffixes
+	// (e.g., "Virtual Machines DSv3 Series v8" → "Virtual Machines DSv3 Series").
+	// Azure recently added these suffixes but the pricing is identical and
+	// CLI filters expect the original format.
+	productName := normalizeAzureProductName(item.ProductName)
+
+	for _, region := range regions {
+		productKey := fmt.Sprintf("%s|%s|%s|%s", productName, item.SkuName, item.MeterName, region)
+		sku := ProductHash("azure-sku", productName, item.SkuName, item.MeterName)
+
+		if _, ok := b.byKey[productKey]; !ok {
+			prodHash := ProductHash("azure", region, item.ServiceName, sku+region)
+			b.byKey[productKey] = &db.Product{
+				ProductHash:   prodHash,
+				SKU:           sku,
+				VendorName:    "azure",
+				Region:        region,
+				Service:       item.ServiceName,
+				ProductFamily: item.ServiceFamily,
+				Attributes:    azureAttributes(item.ServiceName, productName, item.SkuName, item.MeterName, item.ArmSkuName, item.ServiceFamily),
+				Prices:        []db.Price{},
+			}
+		}
+
+		purchaseOption := item.Type
+
+		// Use tierMinimumUnits as startUsageAmount for tiered pricing
+		startUsageAmount := ""
+		if item.TierMinimumUnits > 0 {
+			startUsageAmount = fmt.Sprintf("%g", item.TierMinimumUnits)
+		} else {
+			startUsageAmount = "0"
+		}
+
+		p := b.byKey[productKey]
+		priceH := PriceHash(p.ProductHash, purchaseOption, item.UnitOfMeasure, startUsageAmount, item.MeterName, item.ReservationTerm, "", "")
+
+		p.Prices = append(p.Prices, db.Price{
+			PriceHash:        priceH,
+			PurchaseOption:   purchaseOption,
+			Unit:             item.UnitOfMeasure,
+			USD:              fmt.Sprintf("%.10f", item.RetailPrice),
+			StartUsageAmount: startUsageAmount,
+			Description:      item.MeterName,
+			TermLength:       item.ReservationTerm,
+		})
+		b.primary[productKey] = append(b.primary[productKey], authoritative)
+	}
+}
+
+// azurePriceSlot identifies what one price row prices within a product.
+func azurePriceSlot(p db.Price) string {
+	return p.PurchaseOption + "|" + p.Unit + "|" + p.StartUsageAmount + "|" + p.TermLength
+}
+
+// products drops non-primary prices whose slot has a primary price,
+// de-duplicates, and returns the finished products.
+func (b *azureProductBuilder) products() []db.Product {
 	seen := make(map[string]bool)
-	products := make([]db.Product, 0, len(productMap))
-	for _, p := range productMap {
+	products := make([]db.Product, 0, len(b.byKey))
+	for key, p := range b.byKey {
+		flags := b.primary[key]
+		covered := make(map[string]bool)
+		for i, pr := range p.Prices {
+			if flags[i] {
+				covered[azurePriceSlot(pr)] = true
+			}
+		}
+		kept := p.Prices[:0]
+		for i, pr := range p.Prices {
+			if flags[i] || !covered[azurePriceSlot(pr)] {
+				kept = append(kept, pr)
+			}
+		}
+		p.Prices = kept
+
 		if len(p.Prices) > 0 && !seen[p.ProductHash] {
 			seen[p.ProductHash] = true
 			// For virtual-region products (Zone 1, Global, etc.), aggressively deduplicate
@@ -245,8 +307,7 @@ func (s *AzureScraper) scrapeService(ctx context.Context, serviceName string) ([
 			products = append(products, *p)
 		}
 	}
-
-	return products, nil
+	return products
 }
 
 // deduplicatePrices removes exact duplicate prices (same purchaseOption + unit + startUsageAmount + USD + termLength)

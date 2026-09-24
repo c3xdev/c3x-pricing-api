@@ -55,6 +55,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   set is lost or incomplete.
 
 ### Fixed
+- Azure: rows Azure flags `isPrimaryMeterRegion=false` are ingested when
+  they are the only row for their price. Azure lists a meter under every
+  region it is sold in but makes one region (often "Global") its primary;
+  the other regions carry a copy of the same meter ID at the same price.
+  Dropping those copies left most regions with no row for meters such as
+  AKS "Standard Uptime SLA", Azure Firewall "Standard Data Processed",
+  "General Block Blob v2" Hot/Cool LRS and GRS, Windows App Service Basic
+  and Standard plans and API Management units. A non-primary row now
+  fills a price slot (product, sku, meter, region, purchase option, unit,
+  tier, term) only when no primary row exists for it, so a slot never
+  gets a second, different price, and every price stored before is
+  unchanged. On a sample of every scraped service in eastus and
+  westeurope (40,186 rows, 6,428 non-primary) products grow from 22,245
+  to 25,079; under "Global", from 2,706 to 2,943. The services that were
+  already exempt from the filter are unchanged.
+- Catalog: `aws_cloudwatch_log_group`, `aws_dms_replication_instance`,
+  `aws_kinesis_stream`, `aws_kms_key`, `aws_mq_broker`,
+  `aws_opensearch_domain` and `azurerm_firewall` each had a line whose
+  lookup matched no product (a filter on a value or attribute the data
+  does not carry, or a product family that does not exist), so it was
+  $0 in every region. They now match the right product, and the fixtures
+  carry the vendor-published totals. `azurerm_firewall` is now priced
+  live from the Global meters instead of an inline deployment rate, and
+  `azurerm_service_plan` filters on the OS-specific product name so a
+  Linux plan is not priced at the Windows rate once Windows rows are
+  ingested.
 - AWS products in eu-south-2, eu-central-2, mx-central-1, ap-east-2 and
   ap-southeast-6 were stored under their display name ("Europe (Spain)")
   instead of their region code, because AWS renamed or added the
