@@ -549,15 +549,7 @@ func (s *AWSScraper) buildProductList(raw *awsRawPricing, serviceCode string) []
 	var products []db.Product
 
 	for sku, awsProd := range raw.products {
-		location := awsProd.Attributes["location"]
-		region := AWSLocationToRegion(location)
-		if region == "" {
-			if location == "Any" || location == "Global" || location == "" {
-				region = ""
-			} else {
-				region = location
-			}
-		}
+		region := awsProductRegion(awsProd.Attributes)
 
 		attrs := make(map[string]string)
 		for k, v := range awsProd.Attributes {
