@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Per-request query cost limits on `/graphql`. A `products` query must set
+  both `vendorName` and `service`; one HTTP request may run at most
+  `MAX_PRODUCT_QUERIES_PER_REQUEST` (50) products queries returning at most
+  `MAX_PRODUCTS_PER_REQUEST` (1000) products, summed over aliases and batch
+  items (a field's `limit` is clamped to what is left). Previously a single
+  request under the per-IP rate limit could fan out into hundreds of
+  full-JSONB scans. The c3x CLI sends one query per request with both
+  filters and `limit:50`, so it is unaffected.
+- Global in-flight limit for `/graphql` (`MAX_INFLIGHT_REQUESTS`, default
+  DB pool size minus 2). A request that finds no slot within
+  `INFLIGHT_WAIT_MS` (250) gets `503` with `Retry-After: 1` instead of
+  queueing on the DB pool until its timeout.
+- `.github/workflows/status-monitor.yml`: polls `/status` every 3 hours,
+  fails when a vendor is `failed`, `stale`, `empty` or `never`, and opens
+  (or comments on, only when the unhealthy set changes) a single
+  `status-monitor` issue.
+- `deploy/backup.sh` / `deploy/restore.sh`: compressed, verified,
+  timestamped `pg_dump` archives with N-day retention via
+  `docker compose exec`, and an all-or-nothing restore. Cron line and
+  restore procedure in `deploy/README.md`.
+- Memory limits for the `db` (2g), `api` (1g) and `scraper` (8g) compose
+  services, overridable via `DB_MEM_LIMIT` / `API_MEM_LIMIT` /
+  `SCRAPER_MEM_LIMIT`, with a matching `GOMEMLIMIT` for the Go processes.
+
+### Changed
+- `/metrics` is no longer served on the public port. It is only on its own
+  listener, `METRICS_ADDR` (default `127.0.0.1:9090`, `off` disables).
+  The legacy `METRICS_PORT=<p>` still works and means `:<p>`.
+- GraphQL introspection defaults to disabled when `ENV=production`, and
+  `docker-compose.yml` sets `DISABLE_INTROSPECTION=true`. `__typename`
+  (used by `c3x doctor`) is still allowed.
+- `MAX_BATCH_SIZE` default lowered from 100 (500 in `docker-compose.yml`)
+  to 50. Deployments that set `MAX_BATCH_SIZE` in `.env` keep their value.
+- Attribute equality filters use JSONB containment
+  (`attributes @> '{"k":"v"}'`) instead of `attributes->>'k' = 'v'`, so the
+  existing GIN index on `attributes` serves them instead of a filter over
+  every row of the vendor/service. Results are identical: every stored
+  attribute value is a JSON string. Regex filters are unchanged.
+- Scrape upserts skip products whose `prices`, `attributes` and `sku` are
+  unchanged, so a daily scrape no longer rewrites ~2.9M rows (heap, TOAST
+  and GIN churn). `updated_at` now means "content last changed". Stale
+  cleanup no longer relies on every row being touched: each run records
+  the products it saw in a new UNLOGGED `scrape_seen` table and deletes
+  only the vendor's products it did not see. Cleanup is skipped if that
+  set is lost or incomplete.
+
+### Fixed
+- The compose scraper overlay called `/app/c3x-pricing-api`, but the image
+  installs the binary at `/usr/local/bin`, and computed its next run with
+  GNU/BSD `date` flags that the Alpine image's BusyBox `date` rejects, so
+  the sidecar never scraped. It now calls `c3x-pricing-api` from `PATH`,
+  schedules with shell arithmetic, and exits non-zero on a failed scrape
+  instead of swallowing it with `|| echo`.
+- A failed EC2 region (fetch, parse or upsert) now counts as a failed
+  service, so stale cleanup is skipped instead of deleting that region's
+  EC2 products.
+
 ## [1.1.4] - 2026-09-22
 
 ### Fixed
