@@ -44,10 +44,16 @@ Endpoint: `https://prices.azure.com/api/retail/prices?$filter=serviceName eq '�
   hundreds of pages at ~100 items each.
   🔧 `fetchPage` uses `context.NewRequestWithContext` so SIGTERM actually stops
   a scrape in progress, and retries use `contextSleep` instead of `time.Sleep`.
-- ⚠ **`isPrimaryMeterRegion=false` is the common case for some services**,
-  including DNS, VPN Gateway, and Load Balancer. Filtering it out drops most of their
-  rows. 🔧 We keep a manual `usesVirtualRegions()` allow-list for services
-  whose pricing is keyed by Zone / Global rather than ARM region.
+- ⚠ **`isPrimaryMeterRegion=false` is the common case for many meters.**
+  Azure lists a meter under every region it is sold in and makes one region
+  (often "Global") its primary; the other regions carry a copy of the same
+  meterId at the same price. Dropping those copies leaves the region with no
+  row at all (AKS Uptime SLA, Azure Firewall, General Block Blob v2 LRS/GRS).
+  🔧 `azureProductBuilder` keeps a non-primary row only when no primary row
+  exists for the same price slot (product, sku, meter, region, purchase
+  option, unit, tier, term), so a slot never holds two different prices.
+  Services on `usesVirtualRegions()` and items matched by
+  `skipPrimaryMeterFilter()` are kept unconditionally, as before.
 - ⚠ **Virtual regions ("Zone 1", "Global", "US Gov Zone 1", "DE …") produce
   duplicate prices** when multiple ARM regions map to the same zone.
   🔧 We de-duplicate by `(purchaseOption, unit, startUsageAmount, USD, termLength)`
