@@ -18,6 +18,13 @@ services:
       interval: 2s
       timeout: 5s
       retries: 5
+    # Postgres keeps its working set in shared_buffers plus the page cache;
+    # the cgroup reclaims page cache before OOM-killing, so this caps the
+    # database's footprint on a shared host without starving it.
+    deploy:
+      resources:
+        limits:
+          memory: ${DB_MEM_LIMIT:-2g}
 
   api:
     build: .
@@ -30,12 +37,34 @@ services:
       API_KEY: ${API_KEY:-}
       GCP_API_KEY: ${GCP_API_KEY:-}
       SCRAPE_CONCURRENCY: ${SCRAPE_CONCURRENCY:-4}
-      MAX_BATCH_SIZE: ${MAX_BATCH_SIZE:-500}
+      # Query cost limits. The c3x CLI sends one products query per request
+      # (limit:50) and never batches, so these sit well above its needs.
+      MAX_BATCH_SIZE: ${MAX_BATCH_SIZE:-50}
+      MAX_PRODUCTS_PER_REQUEST: ${MAX_PRODUCTS_PER_REQUEST:-1000}
+      MAX_PRODUCT_QUERIES_PER_REQUEST: ${MAX_PRODUCT_QUERIES_PER_REQUEST:-50}
+      # Concurrent /graphql requests; 0 = DB pool size minus 2. Excess
+      # requests wait INFLIGHT_WAIT_MS, then get 503 + Retry-After.
+      DB_MAX_CONNS: ${DB_MAX_CONNS:-20}
+      MAX_INFLIGHT_REQUESTS: ${MAX_INFLIGHT_REQUESTS:-0}
+      # Public instance: no introspection. Set false in .env for local
+      # GraphQL tooling.
+      DISABLE_INTROSPECTION: ${DISABLE_INTROSPECTION:-true}
+      # /metrics is served only on this listener, never on :4000. It is
+      # loopback inside the container; read it with
+      #   docker compose exec api wget -qO- http://127.0.0.1:9090/metrics
+      # To scrape from the host, set METRICS_ADDR=:9090 and publish
+      # "127.0.0.1:<port>:9090" (never a public interface).
+      METRICS_ADDR: ${METRICS_ADDR:-127.0.0.1:9090}
+      GOMEMLIMIT: ${API_GOMEMLIMIT:-900MiB}
       # Behind Cloudflare: trust the CF edge so rate limiting keys on the
       # real client IP (CF-Connecting-IP) rather than the shared edge IP.
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
     ports:
       - "127.0.0.1:4000:4000"  # localhost only; Caddy reverse-proxies /graphql. Not publicly exposed.
+    deploy:
+      resources:
+        limits:
+          memory: ${API_MEM_LIMIT:-1g}
     depends_on:
       db:
         condition: service_healthy
