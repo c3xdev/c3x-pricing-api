@@ -41,6 +41,17 @@ CREATE INDEX IF NOT EXISTS idx_scrape_runs_vendor_finished
 CREATE INDEX IF NOT EXISTS idx_scrape_runs_finished_at
     ON scrape_runs (finished_at) WHERE finished_at IS NOT NULL;
 
+-- Scrape seen-set: which products a scrape run saw upstream. The upsert
+-- skips unchanged rows, so products.updated_at no longer proves a product
+-- was seen; stale cleanup consults this table instead. UNLOGGED because it
+-- is scratch state: it only matters while its run is in flight, and a crash
+-- that truncates it just means that run's cleanup is skipped/redone.
+CREATE UNLOGGED TABLE IF NOT EXISTS scrape_seen (
+    run_id        BIGINT NOT NULL,
+    product_hash  TEXT   NOT NULL,
+    PRIMARY KEY (run_id, product_hash)
+);
+
 -- Price snapshots: append-only audit trail of price changes per scrape run.
 CREATE TABLE IF NOT EXISTS price_snapshots (
     id              BIGSERIAL PRIMARY KEY,

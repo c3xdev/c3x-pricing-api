@@ -242,9 +242,26 @@ func runOneScrape(ctx context.Context, database *db.DB, s scraper.Scraper, recor
 
 	slog.Info("scraping pricing data", "vendor", s.Name(), "run_id", runID)
 
+	// The seen-set is scratch state for this run's stale cleanup; drop it
+	// however the run ends (also sweeps rows orphaned by crashed runs).
+	defer func() {
+		cctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		if err := database.ClearSeen(cctx, runID); err != nil {
+			slog.Warn("failed to clear scrape_seen", "vendor", s.Name(), "run_id", runID, "error", err)
+		}
+	}()
+
 	var totalProducts int64
 	handler := func(ctx context.Context, products []db.Product) error {
 		if err := database.UpsertProducts(ctx, products); err != nil {
+			return err
+		}
+		// Unchanged products are skipped by the upsert, so record that
+		// this run saw them; stale cleanup deletes whatever it did not.
+		// Failing here must fail the run, or cleanup would delete
+		// products that are still live upstream.
+		if err := database.MarkSeen(ctx, runID, products); err != nil {
 			return err
 		}
 		// A2: Record price snapshots for audit trail. Disabled by default —
@@ -307,7 +324,7 @@ func runOneScrape(ctx context.Context, database *db.DB, s scraper.Scraper, recor
 			"vendor", s.Name(), "current", currentCount, "previous", prevCount)
 	default:
 		var err error
-		deleted, err = database.DeleteStaleProducts(ctx, vendorName, scrapeStart)
+		deleted, err = deleteStaleIfSeenSetComplete(ctx, database, vendorName, runID, scrapeStart, currentCount)
 		if err != nil {
 			slog.Warn("failed to delete stale products", "vendor", s.Name(), "error", err)
 			deleted = 0
@@ -331,6 +348,33 @@ func runOneScrape(ctx context.Context, database *db.DB, s scraper.Scraper, recor
 
 	slog.Info("scrape complete", "vendor", s.Name(), "products", totalProducts, "deleted", deleted)
 	return true, nil
+}
+
+// deleteStaleIfSeenSetComplete runs stale cleanup only when the run's
+// seen-set looks complete. scrape_seen is UNLOGGED, so a Postgres crash
+// mid-run truncates it; cleanup against a truncated set would delete live
+// products. Every upserted product is marked seen, so the distinct count
+// can only fall short of the ingested count by in-run duplicates; a set
+// under half the ingested count means it was lost, and cleanup is skipped.
+func deleteStaleIfSeenSetComplete(ctx context.Context, database *db.DB, vendor string,
+	runID int64, scrapeStart time.Time, ingested int) (int64, error) {
+	var seen int
+	if err := database.Pool.QueryRow(ctx,
+		`SELECT count(*) FROM scrape_seen WHERE run_id = $1`, runID).Scan(&seen); err != nil {
+		return 0, fmt.Errorf("count scrape_seen: %w", err)
+	}
+	if !seenSetComplete(seen, ingested) {
+		slog.Error("scrape_seen is incomplete for this run, skipping stale cleanup",
+			"vendor", vendor, "run_id", runID, "seen", seen, "ingested", ingested)
+		return 0, nil
+	}
+	return database.DeleteStaleProducts(ctx, vendor, runID, scrapeStart)
+}
+
+// seenSetComplete reports whether a run's seen-set can be trusted for
+// stale cleanup (see deleteStaleIfSeenSetComplete).
+func seenSetComplete(seen, ingested int) bool {
+	return seen > 0 && seen >= ingested/2
 }
 
 // scrapeRunRetention returns the retention window for scrape_runs rows.

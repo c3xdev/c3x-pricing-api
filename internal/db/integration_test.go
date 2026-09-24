@@ -12,6 +12,8 @@ package db
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -140,19 +142,269 @@ func TestIntegration_UpsertAndDeleteStale(t *testing.T) {
 		t.Fatalf("UpsertProducts: %v", err)
 	}
 
-	// Bump only the first product; the second should be eligible for stale delete.
+	// Second run re-sends only the first product, UNCHANGED. The upsert
+	// no longer touches it, so its updated_at stays old; the seen-set is
+	// what must keep it alive while h2 (not seen) is deleted.
 	cutoff := time.Now()
 	time.Sleep(50 * time.Millisecond)
+	runID, err := db.StartScrapeRun(ctx, "aws", cutoff)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := db.UpsertProducts(ctx, products[:1]); err != nil {
 		t.Fatalf("second UpsertProducts: %v", err)
 	}
+	if err := db.MarkSeen(ctx, runID, products[:1]); err != nil {
+		t.Fatalf("MarkSeen: %v", err)
+	}
 
-	deleted, err := db.DeleteStaleProducts(ctx, "aws", cutoff)
+	deleted, err := db.DeleteStaleProducts(ctx, "aws", runID, cutoff)
 	if err != nil {
 		t.Fatalf("DeleteStaleProducts: %v", err)
 	}
 	if deleted != 1 {
 		t.Fatalf("deleted=%d, want 1", deleted)
+	}
+	var left []string
+	rows, _ := db.Pool.Query(ctx, `SELECT product_hash FROM products ORDER BY 1`)
+	for rows.Next() {
+		var h string
+		_ = rows.Scan(&h)
+		left = append(left, h)
+	}
+	rows.Close()
+	if len(left) != 1 || left[0] != "h1" {
+		t.Fatalf("remaining products = %v, want [h1]", left)
+	}
+
+	// ClearSeen drops this run's rows once it is no longer running.
+	if err := db.FinishScrapeRun(ctx, runID, "success", 1, deleted, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.ClearSeen(ctx, runID); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	_ = db.Pool.QueryRow(ctx, `SELECT count(*) FROM scrape_seen`).Scan(&n)
+	if n != 0 {
+		t.Fatalf("scrape_seen rows after ClearSeen = %d", n)
+	}
+}
+
+// ClearSeen must not drop the seen-set of another vendor's run that is
+// still in flight (vendors scrape concurrently), but must sweep rows
+// orphaned by a run that crashed.
+func TestIntegration_ClearSeenKeepsRunningRuns(t *testing.T) {
+	db, cleanup := newTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	p := []Product{{ProductHash: "x"}}
+	running, _ := db.StartScrapeRun(ctx, "azure", time.Now())
+	crashed, _ := db.StartScrapeRun(ctx, "gcp", time.Now())
+	mine, _ := db.StartScrapeRun(ctx, "aws", time.Now())
+	for _, id := range []int64{running, crashed, mine} {
+		if err := db.MarkSeen(ctx, id, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = db.FinishScrapeRun(ctx, crashed, "failed", 0, 0, nil)
+
+	if err := db.ClearSeen(ctx, mine); err != nil {
+		t.Fatal(err)
+	}
+	var ids []int64
+	rows, _ := db.Pool.Query(ctx, `SELECT run_id FROM scrape_seen`)
+	for rows.Next() {
+		var id int64
+		_ = rows.Scan(&id)
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if len(ids) != 1 || ids[0] != running {
+		t.Fatalf("scrape_seen run_ids = %v, want only the running run %d", ids, running)
+	}
+}
+
+// An unchanged product must not be rewritten (no new tuple, updated_at
+// kept); a changed one must be.
+func TestIntegration_UpsertSkipsUnchangedRows(t *testing.T) {
+	db, cleanup := newTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	p := Product{
+		ProductHash: "h1", SKU: "SKU-1", VendorName: "aws", Region: "us-east-1", Service: "AmazonEC2",
+		Attributes: map[string]string{"instanceType": "t3.micro", "operatingSystem": "Linux"},
+		Prices:     []Price{{PriceHash: "p1", Unit: "Hrs", USD: "0.0104"}},
+	}
+	if err := db.UpsertProducts(ctx, []Product{p}); err != nil {
+		t.Fatal(err)
+	}
+	state := func() (xmin string, updated time.Time) {
+		t.Helper()
+		if err := db.Pool.QueryRow(ctx,
+			`SELECT xmin::text, updated_at FROM products WHERE product_hash = 'h1'`).Scan(&xmin, &updated); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	x0, u0 := state()
+
+	time.Sleep(20 * time.Millisecond)
+	if err := db.UpsertProducts(ctx, []Product{p}); err != nil {
+		t.Fatal(err)
+	}
+	if x1, u1 := state(); x1 != x0 || !u1.Equal(u0) {
+		t.Fatalf("unchanged product was rewritten: xmin %s->%s updated_at %v->%v", x0, x1, u0, u1)
+	}
+
+	p.Prices = []Price{{PriceHash: "p1", Unit: "Hrs", USD: "0.0200"}}
+	if err := db.UpsertProducts(ctx, []Product{p}); err != nil {
+		t.Fatal(err)
+	}
+	x2, u2 := state()
+	if x2 == x0 || !u2.After(u0) {
+		t.Fatalf("changed product was not rewritten: xmin %s->%s", x0, x2)
+	}
+	var usd string
+	_ = db.Pool.QueryRow(ctx, `SELECT prices->0->>'USD' FROM products WHERE product_hash='h1'`).Scan(&usd)
+	if usd != "0.0200" {
+		t.Fatalf("USD=%s", usd)
+	}
+}
+
+// Containment and ->> equality must select the same rows for the values
+// the scrapers store (all attribute values are JSON strings), including
+// escaping-sensitive values, empty strings and absent keys.
+func TestIntegration_AttributeContainmentMatchesTextEquality(t *testing.T) {
+	db, cleanup := newTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	values := []string{"m5.xlarge", "M5.XLARGE", `Quote"d\Back`, "", "unicode é ü", "<&>", " padded "}
+	var products []Product
+	for i, v := range values {
+		products = append(products, Product{
+			ProductHash: fmt.Sprintf("h%d", i), SKU: "s", VendorName: "aws", Service: "svc",
+			Attributes: map[string]string{"k": v, "other": "x"},
+			Prices:     []Price{},
+		})
+	}
+	products = append(products, Product{ProductHash: "nokey", SKU: "s", VendorName: "aws", Service: "svc",
+		Attributes: map[string]string{"other": "x"}, Prices: []Price{}})
+	if err := db.UpsertProducts(ctx, products); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, v := range append(values, "absent-value") {
+		v := v
+		got, err := db.QueryProducts(ctx, &ProductFilter{VendorName: strp("aws"), Service: strp("svc"),
+			AttributeFilters: []AttributeFilter{{Key: "k", Value: &v}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var want int
+		if err := db.Pool.QueryRow(ctx,
+			`SELECT count(*) FROM products WHERE vendor_name='aws' AND service='svc' AND attributes->>'k' = $1`, v).Scan(&want); err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != want {
+			t.Errorf("value %q: containment matched %d rows, ->> matched %d", v, len(got), want)
+		}
+	}
+	// Every stored attribute value is a JSON string.
+	var nonString int
+	_ = db.Pool.QueryRow(ctx,
+		`SELECT count(*) FROM products, jsonb_each(attributes) e WHERE jsonb_typeof(e.value) <> 'string'`).Scan(&nonString)
+	if nonString != 0 {
+		t.Fatalf("%d non-string attribute values stored", nonString)
+	}
+}
+
+// EXPLAIN evidence: on a table shaped like production (one huge
+// vendor+service partition), containment is served by the GIN index while
+// the old ->> form has to filter every row of the partition.
+func TestIntegration_AttributeEqualityUsesGINIndex(t *testing.T) {
+	db, cleanup := newTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	if _, err := db.Pool.Exec(ctx, `
+		INSERT INTO products (product_hash, sku, vendor_name, region, service, product_family, attributes, prices)
+		SELECT 'h' || n, 'sku' || n, 'aws', 'us-east-1', 'AmazonEC2', 'Compute Instance',
+		       jsonb_build_object(
+		         'instanceType', 'i' || (n % 700),
+		         'operatingSystem', (ARRAY['Linux','Windows','RHEL','SUSE'])[1 + n % 4],
+		         'tenancy', (ARRAY['Shared','Dedicated','Host'])[1 + n % 3],
+		         'capacitystatus', (ARRAY['Used','UnusedCapacityReservation','AllocatedCapacityReservation'])[1 + n % 3],
+		         'usagetype', 'BoxUsage:i' || (n % 700)),
+		       '[{"USD":"0.1","unit":"Hrs","priceHash":"p"}]'::jsonb
+		FROM generate_series(1, 200000) AS n`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(ctx, `ANALYZE products`); err != nil {
+		t.Fatal(err)
+	}
+
+	explain := func(q string, args ...interface{}) string {
+		t.Helper()
+		rows, err := db.Pool.Query(ctx, "EXPLAIN (ANALYZE, BUFFERS, COSTS OFF) "+q, args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		var b strings.Builder
+		for rows.Next() {
+			var line string
+			_ = rows.Scan(&line)
+			b.WriteString(line + "\n")
+		}
+		return b.String()
+	}
+
+	f := &ProductFilter{VendorName: strp("aws"), Service: strp("AmazonEC2"),
+		ProductFamily: strp("Compute Instance"), Region: strp("us-east-1"), Limit: 50,
+		AttributeFilters: []AttributeFilter{
+			{Key: "instanceType", Value: strp("i42")},
+			// 700 is a multiple of 4, so every i42 row is RHEL.
+			{Key: "operatingSystem", Value: strp("RHEL")},
+			{Key: "tenancy", Value: strp("Shared")},
+		}}
+	newSQL, newArgs, err := buildProductQuery(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newPlan := explain(newSQL, newArgs...)
+	oldPlan := explain(`SELECT product_hash, sku, vendor_name, region, service, product_family, attributes, prices FROM products
+		WHERE vendor_name = $1 AND service = $2 AND product_family = $3 AND region = $4
+		AND (attributes->>'usagetype' IS NULL OR attributes->>'usagetype' NOT LIKE 'Global%')
+		AND attributes->>$5 = $6 AND attributes->>$7 = $8 AND attributes->>$9 = $10
+		ORDER BY product_hash LIMIT 50`,
+		"aws", "AmazonEC2", "Compute Instance", "us-east-1",
+		"instanceType", "i42", "operatingSystem", "RHEL", "tenancy", "Shared")
+	t.Logf("containment (new) plan:\n%s", newPlan)
+	t.Logf("->> equality (old) plan:\n%s", oldPlan)
+
+	if !strings.Contains(newPlan, "idx_products_attributes") {
+		t.Fatalf("containment query did not use the GIN index:\n%s", newPlan)
+	}
+	if strings.Contains(oldPlan, "idx_products_attributes") {
+		t.Fatalf("->> query unexpectedly used the GIN index:\n%s", oldPlan)
+	}
+
+	got, err := db.QueryProducts(ctx, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want int
+	_ = db.Pool.QueryRow(ctx, `SELECT count(*) FROM products WHERE attributes->>'instanceType'='i42'
+		AND attributes->>'operatingSystem'='RHEL' AND attributes->>'tenancy'='Shared'`).Scan(&want)
+	if want > f.Limit {
+		want = f.Limit
+	}
+	if len(got) != want || want == 0 {
+		t.Fatalf("containment returned %d rows, ->> %d (limit %d)", len(got), want, f.Limit)
 	}
 }
 

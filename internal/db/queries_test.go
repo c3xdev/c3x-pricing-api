@@ -89,10 +89,10 @@ func TestNormalizeRegexForPrefix(t *testing.T) {
 	}{
 		{`\-RDS\:Multi\-AZ\-GP3\-Storage$`, `(^|-)RDS\:Multi\-AZ\-GP3\-Storage$`},
 		{`\-RDS\:GP3\-Storage$`, `(^|-)RDS\:GP3\-Storage$`},
-		{`GP3-Storage$`, `GP3-Storage$`},         // no leading \-, unchanged
-		{`^aws.*$`, `^aws.*$`},                    // no leading \-, unchanged
-		{``, ``},                                  // empty string
-		{`\-`, `(^|-)`},                           // just the escaped hyphen
+		{`GP3-Storage$`, `GP3-Storage$`}, // no leading \-, unchanged
+		{`^aws.*$`, `^aws.*$`},           // no leading \-, unchanged
+		{``, ``},                         // empty string
+		{`\-`, `(^|-)`},                  // just the escaped hyphen
 	}
 
 	for _, tt := range tests {
@@ -120,3 +120,103 @@ func TestMatchRegexPattern_RegionPrefixNormalization(t *testing.T) {
 	}
 }
 
+func strp(s string) *string { return &s }
+
+func TestBuildProductQuery_EqualityUsesContainment(t *testing.T) {
+	f := &ProductFilter{
+		VendorName: strp("aws"), Service: strp("AmazonEC2"),
+		ProductFamily: strp("Compute Instance"), Region: strp("us-east-1"),
+		AttributeFilters: []AttributeFilter{
+			{Key: "instanceType", Value: strp("m5.xlarge")},
+			{Key: "volumeType", Value: strp(`Quote"d\Back`)},
+			{Key: "usagetype", ValueRegex: strp(`/\-RDS\:GP3\-Storage$/i`)},
+		},
+		Limit: 50,
+	}
+	q, args, err := buildProductQuery(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `SELECT product_hash, sku, vendor_name, region, service, product_family, attributes, prices FROM products WHERE 1=1` +
+		` AND vendor_name = $1 AND service = $2 AND product_family = $3 AND region = $4` +
+		` AND (attributes->>'usagetype' IS NULL OR attributes->>'usagetype' NOT LIKE 'Global%')` +
+		` AND attributes @> $5::jsonb AND attributes @> $6::jsonb` +
+		` AND attributes->>$7 ~* $8` +
+		` ORDER BY product_hash LIMIT $9`
+	if q != want {
+		t.Fatalf("SQL mismatch\n got: %s\nwant: %s", q, want)
+	}
+	wantArgs := []interface{}{"aws", "AmazonEC2", "Compute Instance", "us-east-1",
+		`{"instanceType":"m5.xlarge"}`, `{"volumeType":"Quote\"d\\Back"}`,
+		"usagetype", `(^|-)RDS\:GP3\-Storage$`, 50}
+	if len(args) != len(wantArgs) {
+		t.Fatalf("args = %#v", args)
+	}
+	for i := range wantArgs {
+		if args[i] != wantArgs[i] {
+			t.Errorf("arg %d = %#v, want %#v", i+1, args[i], wantArgs[i])
+		}
+	}
+	if strings.Contains(q, "attributes->>$5 =") {
+		t.Fatal("equality must not use ->> (it cannot use the GIN index)")
+	}
+}
+
+// Two equality filters on one key must stay two clauses (and so match
+// nothing when the values differ), exactly as the old ->> form did.
+func TestBuildProductQuery_SameKeyTwiceStaysTwoClauses(t *testing.T) {
+	f := &ProductFilter{VendorName: strp("aws"), Service: strp("s"),
+		AttributeFilters: []AttributeFilter{{Key: "k", Value: strp("a")}, {Key: "k", Value: strp("b")}}}
+	q, args, err := buildProductQuery(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(q, "attributes @>") != 2 || args[2] != `{"k":"a"}` || args[3] != `{"k":"b"}` {
+		t.Fatalf("q=%s args=%v", q, args)
+	}
+}
+
+func TestBuildProductQuery_LimitAndPagination(t *testing.T) {
+	base := func() *ProductFilter { return &ProductFilter{VendorName: strp("aws"), Service: strp("s")} }
+
+	_, args, _ := buildProductQuery(base())
+	if args[len(args)-1] != maxProductLimit {
+		t.Fatalf("unset limit should default to %d, got %v", maxProductLimit, args[len(args)-1])
+	}
+
+	f := base()
+	f.Limit = 999999
+	_, args, _ = buildProductQuery(f)
+	if args[len(args)-1] != maxProductLimit {
+		t.Fatalf("oversized limit should clamp, got %v", args[len(args)-1])
+	}
+
+	f = base()
+	f.Limit, f.Offset = 10, 20
+	q, args, _ := buildProductQuery(f)
+	if !strings.HasSuffix(q, "ORDER BY product_hash LIMIT $3 OFFSET $4") || args[2] != 10 || args[3] != 20 {
+		t.Fatalf("offset path: %s %v", q, args)
+	}
+
+	f = base()
+	f.AfterHash = "abc"
+	q, _, _ = buildProductQuery(f)
+	if !strings.HasSuffix(q, "AND product_hash > $3 ORDER BY product_hash LIMIT $4") {
+		t.Fatalf("keyset path: %s", q)
+	}
+}
+
+func TestBuildProductQuery_RegexTooLong(t *testing.T) {
+	f := &ProductFilter{AttributeFilters: []AttributeFilter{{Key: "k", ValueRegex: strp(strings.Repeat("a", maxRegexLength+1))}}}
+	if _, _, err := buildProductQuery(f); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestUpsertSkipsUnchangedRows(t *testing.T) {
+	for _, col := range []string{"prices", "attributes", "sku"} {
+		if !strings.Contains(upsertChangedOnly, "products."+col+" IS DISTINCT FROM EXCLUDED."+col) {
+			t.Errorf("upsert WHERE clause must compare %s", col)
+		}
+	}
+}

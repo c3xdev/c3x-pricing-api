@@ -67,3 +67,25 @@ func TestEmptyScrapeErrorFlagsEmptyRuns(t *testing.T) {
 		})
 	}
 }
+
+// TestSeenSetComplete guards stale cleanup against a lost seen-set
+// (scrape_seen is UNLOGGED and is truncated by a Postgres crash): an
+// empty or badly short set must never authorise deleting products.
+func TestSeenSetComplete(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		seen, ingested int
+		want           bool
+	}{
+		{0, 0, false},
+		{0, 1000, false},
+		{400, 1000, false},
+		{500, 1000, true}, // in-run duplicates only ever shrink the set
+		{1000, 1000, true},
+	}
+	for _, c := range cases {
+		if got := seenSetComplete(c.seen, c.ingested); got != c.want {
+			t.Errorf("seenSetComplete(%d, %d) = %v, want %v", c.seen, c.ingested, got, c.want)
+		}
+	}
+}
