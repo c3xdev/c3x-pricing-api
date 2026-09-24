@@ -21,7 +21,7 @@ This starts:
 To trigger a scrape manually:
 
 ```bash
-docker compose exec scraper /app/c3x-pricing-api scrape --vendor aws
+docker compose exec scraper c3x-pricing-api scrape --vendor aws
 ```
 
 ## Why a sidecar and not `docker compose run`?

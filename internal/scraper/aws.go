@@ -390,6 +390,7 @@ func (s *AWSScraper) streamEC2ByRegion(ctx context.Context, handler ProductHandl
 
 			if len(products) > 0 {
 				if err := handler(gctx, products); err != nil {
+					atomic.AddInt64(&totalFailed, 1)
 					slog.Warn("EC2 region upsert failed", "region", r.name, "error", err)
 					return nil
 				}
@@ -411,6 +412,11 @@ func (s *AWSScraper) streamEC2ByRegion(ctx context.Context, handler ProductHandl
 		return fmt.Errorf("all %d EC2 regions failed to scrape", failed)
 	}
 	if failed > 0 {
+		// Count failed regions as failed services so the orchestrator
+		// skips stale cleanup: a region that was not fetched, parsed or
+		// written was not seen by this run, and cleanup would otherwise
+		// delete every one of its products.
+		atomic.AddInt64(&s.failedServices, failed)
 		slog.Warn("some EC2 regions failed", "failed", failed, "total_products", total)
 	}
 

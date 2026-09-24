@@ -110,10 +110,34 @@ func compileRegex(pattern string) (*regexp.Regexp, error) {
 }
 
 func (d *DB) QueryProducts(ctx context.Context, filter *ProductFilter) ([]Product, error) {
+	query, args, err := buildProductQuery(filter)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := d.Pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query failed: %w", err)
+	}
+	defer rows.Close()
+	return scanProducts(rows)
+}
+
+// EffectiveLimit is the row limit QueryProducts applies for a requested
+// limit: non-positive or oversized values fall back to the server cap.
+func EffectiveLimit(requested int) int {
+	if requested <= 0 || requested > maxProductLimit {
+		return defaultProductLimit
+	}
+	return requested
+}
+
+// buildProductQuery renders the SQL and arguments for a products lookup.
+// Split out from QueryProducts so the generated SQL is unit-testable.
+func buildProductQuery(filter *ProductFilter) (string, []interface{}, error) {
 	// Validate regex lengths
 	for _, af := range filter.AttributeFilters {
 		if af.ValueRegex != nil && len(*af.ValueRegex) > maxRegexLength {
-			return nil, fmt.Errorf("regex pattern too long: %d chars exceeds maximum of %d", len(*af.ValueRegex), maxRegexLength)
+			return "", nil, fmt.Errorf("regex pattern too long: %d chars exceeds maximum of %d", len(*af.ValueRegex), maxRegexLength)
 		}
 	}
 
@@ -150,12 +174,26 @@ func (d *DB) QueryProducts(ctx context.Context, filter *ProductFilter) ([]Produc
 		argIdx++
 	}
 
-	// Push attribute matches into SQL for performance
+	// Push attribute matches into SQL for performance.
+	//
+	// Equality uses JSONB containment (attributes @> '{"k":"v"}') rather
+	// than attributes->>'k' = 'v': only containment can be served by the
+	// GIN index on attributes, the ->> form forces a scan of every row the
+	// btree prefix matched. The two are equivalent here because every
+	// attribute value is stored as a JSON string (Product.Attributes is a
+	// map[string]string, marshalled as-is by upsertBatch), and for a string
+	// value ->> returns exactly the unescaped string containment compares.
+	// One clause per filter (not one merged object) keeps the semantics of
+	// two filters on the same key with different values: no match.
 	for _, af := range filter.AttributeFilters {
 		if af.Value != nil {
-			query += fmt.Sprintf(" AND attributes->>$%d = $%d", argIdx, argIdx+1)
-			args = append(args, af.Key, *af.Value)
-			argIdx += 2
+			obj, err := json.Marshal(map[string]string{af.Key: *af.Value})
+			if err != nil {
+				return "", nil, fmt.Errorf("encode attribute filter %q: %w", af.Key, err)
+			}
+			query += fmt.Sprintf(" AND attributes @> $%d::jsonb", argIdx)
+			args = append(args, string(obj))
+			argIdx++
 		} else if af.ValueRegex != nil {
 			pgRegex, caseInsensitive := parseRegexForPostgres(*af.ValueRegex)
 			if pgRegex != "" {
@@ -172,35 +210,20 @@ func (d *DB) QueryProducts(ctx context.Context, filter *ProductFilter) ([]Produc
 	}
 
 	// Pagination: keyset (AfterHash) is preferred over OFFSET for O(1) deep pages.
-	limit := filter.Limit
-	if limit <= 0 || limit > maxProductLimit {
-		limit = defaultProductLimit
-	}
+	limit := EffectiveLimit(filter.Limit)
 	if filter.AfterHash != "" {
 		query += fmt.Sprintf(" AND product_hash > $%d", argIdx)
 		args = append(args, filter.AfterHash)
 		argIdx++
 	} else if filter.Offset > 0 {
+		// Legacy offset path.
 		query += fmt.Sprintf(" ORDER BY product_hash LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
 		args = append(args, limit, filter.Offset)
-		// Early return for legacy offset path
-		rows, err := d.Pool.Query(ctx, query, args...)
-		if err != nil {
-			return nil, fmt.Errorf("query failed: %w", err)
-		}
-		defer rows.Close()
-		return scanProducts(rows)
+		return query, args, nil
 	}
 	query += fmt.Sprintf(" ORDER BY product_hash LIMIT $%d", argIdx)
 	args = append(args, limit)
-
-	rows, err := d.Pool.Query(ctx, query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("query failed: %w", err)
-	}
-	defer rows.Close()
-
-	return scanProducts(rows)
+	return query, args, nil
 }
 
 func scanProducts(rows pgx.Rows) ([]Product, error) {
@@ -229,7 +252,6 @@ func scanProducts(rows pgx.Rows) ([]Product, error) {
 
 	return products, rows.Err()
 }
-
 
 // MatchRegexPattern matches a value against a /PATTERN/ or /PATTERN/i regex pattern.
 // Handles negative lookaheads (?!...) which Go's RE2 doesn't support natively.
@@ -619,18 +641,76 @@ func (d *DB) upsertBatch(ctx context.Context, products []Product) error {
 			attributes = EXCLUDED.attributes,
 			prices = EXCLUDED.prices,
 			updated_at = NOW()
-	`, strings.Join(valueStrings, ","))
+		%s
+	`, strings.Join(valueStrings, ","), upsertChangedOnly)
 
 	_, err := d.Pool.Exec(ctx, query, args...)
 	return err
 }
 
-// DeleteStaleProducts removes products for a vendor that were not updated after the given time.
-// This cleans up products that no longer exist in the upstream pricing data after a re-scrape.
-func (d *DB) DeleteStaleProducts(ctx context.Context, vendor string, before time.Time) (int64, error) {
+// upsertChangedOnly makes the upsert skip rows whose content is unchanged.
+// A daily scrape re-sends ~2.9M products, nearly all identical; rewriting
+// them churned the heap, TOAST and the GIN index for nothing. JSONB
+// IS DISTINCT FROM compares semantically (key order and whitespace do not
+// matter), so an identical product is a no-op and keeps its updated_at,
+// which now means "content last changed". Liveness for stale cleanup is
+// tracked separately in scrape_seen (see MarkSeen).
+const upsertChangedOnly = `WHERE products.prices IS DISTINCT FROM EXCLUDED.prices
+			OR products.attributes IS DISTINCT FROM EXCLUDED.attributes
+			OR products.sku IS DISTINCT FROM EXCLUDED.sku`
+
+// MarkSeen records that a scrape run saw the given products upstream.
+// Because unchanged products are no longer rewritten by the upsert, their
+// updated_at cannot tell stale cleanup whether this run saw them; the
+// narrow, unlogged scrape_seen table does that instead, far cheaper than
+// touching the wide products row.
+func (d *DB) MarkSeen(ctx context.Context, runID int64, products []Product) error {
+	if runID <= 0 || len(products) == 0 {
+		return nil
+	}
+	hashes := make([]string, len(products))
+	for i, p := range products {
+		hashes[i] = p.ProductHash
+	}
+	_, err := d.Pool.Exec(ctx,
+		`INSERT INTO scrape_seen (run_id, product_hash)
+		 SELECT $1, h FROM unnest($2::text[]) AS h
+		 ON CONFLICT DO NOTHING`,
+		runID, hashes,
+	)
+	if err != nil {
+		return fmt.Errorf("mark %d products seen for run %d: %w", len(hashes), runID, err)
+	}
+	return nil
+}
+
+// ClearSeen drops the scrape_seen rows of the given run, plus any left
+// behind by runs that are no longer running (a crashed scrape never gets
+// to clear its own). Rows of other in-flight runs are kept.
+func (d *DB) ClearSeen(ctx context.Context, runID int64) error {
+	_, err := d.Pool.Exec(ctx,
+		`DELETE FROM scrape_seen s
+		 WHERE s.run_id = $1
+		    OR NOT EXISTS (SELECT 1 FROM scrape_runs r WHERE r.id = s.run_id AND r.status = 'running')`,
+		runID,
+	)
+	if err != nil {
+		return fmt.Errorf("clear scrape_seen for run %d: %w", runID, err)
+	}
+	return nil
+}
+
+// DeleteStaleProducts removes a vendor's products that the given scrape run
+// did not see: neither written after `before` (the run's start) nor recorded
+// in scrape_seen by MarkSeen. This cleans up products that no longer exist
+// upstream after a re-scrape. The updated_at test short-circuits rows the
+// run changed; the scrape_seen test keeps rows the run saw unchanged.
+func (d *DB) DeleteStaleProducts(ctx context.Context, vendor string, runID int64, before time.Time) (int64, error) {
 	result, err := d.Pool.Exec(ctx,
-		"DELETE FROM products WHERE vendor_name = $1 AND updated_at < $2",
-		vendor, before,
+		`DELETE FROM products p
+		 WHERE p.vendor_name = $1 AND p.updated_at < $2
+		   AND NOT EXISTS (SELECT 1 FROM scrape_seen s WHERE s.run_id = $3 AND s.product_hash = p.product_hash)`,
+		vendor, before, runID,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("delete stale products for %s: %w", vendor, err)

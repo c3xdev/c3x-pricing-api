@@ -94,16 +94,20 @@ table.
 | `SCRAPE_CONCURRENCY_AZURE` | `8` | Azure-specific override |
 | `SCRAPE_CONCURRENCY_GCP` | `0` | GCP-specific override (0 = inherit global) |
 | `MAX_REQUEST_BODY_MB` | `4` | Maximum request body size in MB |
-| `MAX_BATCH_SIZE` | `100` | Maximum number of queries per batch request |
+| `MAX_BATCH_SIZE` | `50` | Maximum number of queries per batch request |
+| `MAX_PRODUCTS_PER_REQUEST` | `1000` | Products returned per HTTP request, summed over all `products` fields (aliases) and batch items. A field's limit is clamped to what is left; once spent, further fields error |
+| `MAX_PRODUCT_QUERIES_PER_REQUEST` | `50` | `products` fields (each one a DB query) per HTTP request, across aliases and batch items |
+| `MAX_INFLIGHT_REQUESTS` | `0` | Concurrent `/graphql` requests. `0` = DB pool max minus 2 (min 1), `-1` = unbounded |
+| `INFLIGHT_WAIT_MS` | `250` | How long a request waits for an in-flight slot before `503` + `Retry-After` |
 | `QUERY_TIMEOUT_SECS` | `30` | Query execution timeout in seconds |
 | `MAX_QUERY_DEPTH` | `10` | Maximum GraphQL query nesting depth |
 | `RATE_LIMIT_PER_SEC` | `100` | Maximum requests per second per IP |
 | `CORS_ALLOWED_ORIGINS` | *(empty)* | Comma-separated allowed CORS origins. `*` = all |
 | `TRUSTED_PROXIES` | *(empty)* | Comma-separated CIDRs/IPs whose `CF-Connecting-IP` / `X-Forwarded-For` is trusted for the real client IP (used by rate limiting and metrics). Use the literal `cloudflare` to trust Cloudflare's published edge ranges. Behind Cloudflare, set this or rate limiting keys on the Cloudflare edge IP. |
-| `DISABLE_INTROSPECTION` | `false` | Block GraphQL introspection queries |
+| `DISABLE_INTROSPECTION` | `true` if `ENV=production`, else `false` | Block GraphQL introspection queries (`__typename` is always allowed) |
 | `DB_MAX_CONNS` | `0` | Max database pool connections (0 = pgx default) |
 | `DB_MIN_CONNS` | `0` | Min database pool connections (0 = pgx default) |
-| `METRICS_PORT` | *(empty)* | Separate port for /metrics. Empty = main port |
+| `METRICS_ADDR` | `127.0.0.1:9090` | Listen address for `/metrics`, which is never served on `PORT`. `off` disables it. Legacy `METRICS_PORT=<p>` still works and means `:<p>` |
 | `CNY_USD_RATE` | `6.2069` | CNY/USD exchange rate for AWS China pricing |
 
 ## Scraping

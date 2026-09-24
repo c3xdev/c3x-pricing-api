@@ -52,10 +52,32 @@ type Config struct {
 	DBMinConns int
 	// Env is the deployment environment (e.g. "development", "production").
 	Env string
-	// MetricsPort serves /metrics on a separate port for security isolation.
-	// Empty or "0" = serve on the main port (backward compatible).
-	MetricsPort string
+	// MetricsAddr is the listen address of the dedicated /metrics listener.
+	// /metrics is never served on the public mux. Defaults to
+	// 127.0.0.1:9090 (localhost only). "off" disables the listener. The
+	// legacy METRICS_PORT=<port> is still honoured and means ":<port>".
+	MetricsAddr string
+	// MaxProductsPerRequest caps the total number of products returned by
+	// one HTTP request, summed over every `products` field (aliases) in
+	// every batch item. A field whose limit would exceed the remaining
+	// budget is clamped to it; once the budget is spent further fields
+	// error.
+	MaxProductsPerRequest int
+	// MaxProductQueriesPerRequest caps how many `products` fields one HTTP
+	// request may resolve, across aliases and batch items. Each one is a
+	// database query, so this is the bound on DB work per request.
+	MaxProductQueriesPerRequest int
+	// MaxInflightRequests bounds concurrent /graphql requests so a burst
+	// cannot exhaust the DB pool. 0 = derive from the pool size (pool max
+	// minus 2, reserved for /readyz and /status; minimum 1).
+	MaxInflightRequests int
+	// InflightWaitMillis is how long a /graphql request waits for a free
+	// slot before the server answers 503 with Retry-After.
+	InflightWaitMillis int
 }
+
+// DefaultMetricsAddr keeps /metrics reachable only from the host itself.
+const DefaultMetricsAddr = "127.0.0.1:9090"
 
 func Load() *Config {
 	return &Config{
@@ -70,18 +92,42 @@ func Load() *Config {
 		EnablePriceSnapshots:   getEnvBool("ENABLE_PRICE_SNAPSHOTS", false),
 		LogLevel:               getEnv("LOG_LEVEL", "info"),
 		MaxRequestBodyMB:       getEnvInt("MAX_REQUEST_BODY_MB", 4),
-		MaxBatchSize:           getEnvInt("MAX_BATCH_SIZE", 100),
+		MaxBatchSize:           getEnvInt("MAX_BATCH_SIZE", 50),
 		QueryTimeoutSecs:       getEnvInt("QUERY_TIMEOUT_SECS", 30),
 		RateLimitPerSec:        getEnvInt("RATE_LIMIT_PER_SEC", 100),
 		MaxQueryDepth:          getEnvInt("MAX_QUERY_DEPTH", 10),
-		DisableIntrospection:   getEnvBool("DISABLE_INTROSPECTION", false),
-		CNYUSDRate:             getEnvFloat("CNY_USD_RATE", 6.2069),
-		CORSOrigins:            getEnv("CORS_ALLOWED_ORIGINS", ""),
-		DBMaxConns:             getEnvInt("DB_MAX_CONNS", 0),
-		DBMinConns:             getEnvInt("DB_MIN_CONNS", 0),
-		Env:                    getEnv("ENV", "development"),
-		MetricsPort:            getEnv("METRICS_PORT", ""),
+		// Introspection defaults off in production and on elsewhere, so
+		// local tooling keeps working; DISABLE_INTROSPECTION overrides.
+		DisableIntrospection: getEnvBool("DISABLE_INTROSPECTION",
+			strings.EqualFold(getEnv("ENV", "development"), "production")),
+		CNYUSDRate:  getEnvFloat("CNY_USD_RATE", 6.2069),
+		CORSOrigins: getEnv("CORS_ALLOWED_ORIGINS", ""),
+		DBMaxConns:  getEnvInt("DB_MAX_CONNS", 0),
+		DBMinConns:  getEnvInt("DB_MIN_CONNS", 0),
+		Env:         getEnv("ENV", "development"),
+		MetricsAddr: metricsAddr(),
+
+		MaxProductsPerRequest:       getEnvInt("MAX_PRODUCTS_PER_REQUEST", 1000),
+		MaxProductQueriesPerRequest: getEnvInt("MAX_PRODUCT_QUERIES_PER_REQUEST", 50),
+		MaxInflightRequests:         getEnvInt("MAX_INFLIGHT_REQUESTS", 0),
+		InflightWaitMillis:          getEnvInt("INFLIGHT_WAIT_MS", 250),
 	}
+}
+
+// metricsAddr resolves the /metrics listen address: METRICS_ADDR wins, then
+// the legacy METRICS_PORT (":<port>", all interfaces, as before), then the
+// localhost-only default.
+func metricsAddr() string {
+	if v := strings.TrimSpace(os.Getenv("METRICS_ADDR")); v != "" {
+		return v
+	}
+	if p := strings.TrimSpace(os.Getenv("METRICS_PORT")); p != "" {
+		if p == "0" {
+			return "off"
+		}
+		return ":" + p
+	}
+	return DefaultMetricsAddr
 }
 
 // Validate checks that required configuration values are set.

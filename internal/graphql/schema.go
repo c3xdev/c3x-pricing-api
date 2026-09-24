@@ -7,7 +7,7 @@ import (
 	gql "github.com/graphql-go/graphql"
 )
 
-func NewSchema(database *db.DB) (gql.Schema, error) {
+func NewSchema(database ProductQuerier) (gql.Schema, error) {
 	attributeType := gql.NewObject(gql.ObjectConfig{
 		Name: "Attribute",
 		Fields: gql.Fields{
@@ -129,13 +129,27 @@ func NewSchema(database *db.DB) (gql.Schema, error) {
 				Resolve: func(p gql.ResolveParams) (interface{}, error) {
 					filterArg := p.Args["filter"].(map[string]interface{})
 					filter := parseProductFilter(filterArg)
+					if err := validateProductFilter(filter); err != nil {
+						return nil, err
+					}
 					if v, ok := p.Args["limit"].(int); ok {
 						filter.Limit = v
 					}
 					if v, ok := p.Args["offset"].(int); ok {
 						filter.Offset = v
 					}
-					return database.QueryProducts(p.Context, filter)
+					budget := budgetFrom(p.Context)
+					if budget == nil {
+						return database.QueryProducts(p.Context, filter)
+					}
+					reserved, err := budget.reserve(db.EffectiveLimit(filter.Limit))
+					if err != nil {
+						return nil, err
+					}
+					filter.Limit = reserved
+					products, err := database.QueryProducts(p.Context, filter)
+					budget.refund(reserved, len(products))
+					return products, err
 				},
 			},
 		},

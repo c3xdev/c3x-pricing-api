@@ -54,6 +54,10 @@ type Server struct {
 
 	// stopCh is closed when the server shuts down, to signal background goroutines.
 	stopCh chan struct{}
+
+	// inflight is a counting semaphore bounding concurrent /graphql
+	// requests (see inflightMiddleware). nil = unbounded.
+	inflight chan struct{}
 }
 
 // ipLimiter holds the rate.Limiter for an IP plus its last-use timestamp for LRU eviction.
@@ -86,6 +90,15 @@ func New(cfg *config.Config, database *db.DB) (*Server, error) {
 		rateLimiters: make(map[string]*list.Element),
 		rateLRU:      list.New(),
 		stopCh:       make(chan struct{}),
+	}
+
+	poolMax := 0
+	if database != nil && database.Pool != nil {
+		poolMax = int(database.Pool.Config().MaxConns)
+	}
+	if n := inflightLimit(cfg.MaxInflightRequests, poolMax); n > 0 {
+		s.inflight = make(chan struct{}, n)
+		slog.Info("graphql in-flight limit", "max", n, "db_pool_max", poolMax)
 	}
 
 	// Parse TRUSTED_PROXIES once at startup instead of per-request.
@@ -166,17 +179,34 @@ func (s *Server) Stop() {
 	close(s.stopCh)
 }
 
-func (s *Server) Start() error {
-	// Register Go + process collectors on our dedicated registry so /metrics
-	// exposes runtime stats in addition to the custom HTTP/scrape metrics.
-	metricsRegistry.MustRegister(
-		collectors.NewGoCollector(),
-		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
-	)
+// inflightLimit resolves the /graphql concurrency cap. An explicit
+// positive value wins. 0 derives it from the DB pool: every /graphql
+// request holds at most one connection at a time (batch items run
+// serially), so pool max minus two leaves connections for /readyz and
+// /status instead of letting a burst queue on the pool until timeouts.
+// A negative value disables the cap.
+func inflightLimit(configured, poolMax int) int {
+	if configured != 0 {
+		if configured < 0 {
+			return 0
+		}
+		return configured
+	}
+	if poolMax <= 0 {
+		return 0
+	}
+	if n := poolMax - 2; n >= 1 {
+		return n
+	}
+	return 1
+}
 
+// publicHandler builds the public mux. /metrics is deliberately absent:
+// it is served only by metricsHandler on its own listener.
+func (s *Server) publicHandler() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/graphql", instrument("graphql",
-		s.requestIDMiddleware(recoverMiddleware(s.rateLimitMiddleware(s.authMiddleware(s.handleGraphQL))))))
+		s.requestIDMiddleware(recoverMiddleware(s.rateLimitMiddleware(s.authMiddleware(s.inflightMiddleware(s.handleGraphQL)))))))
 	mux.HandleFunc("/healthz", instrument("healthz", s.handleLiveness))
 	mux.HandleFunc("/readyz", instrument("readyz", s.handleReadiness))
 	mux.HandleFunc("/health", instrument("readyz", s.handleReadiness)) // backward compat
@@ -186,28 +216,44 @@ func (s *Server) Start() error {
 	// matched above, so this also covers unknown paths. It answers "/"
 	// with a 200 and X-Robots-Tag: noindex (so a search engine that
 	// indexed the bare host recrawls, sees the noindex, and drops it)
-	// and returns 404 for everything else.
+	// and returns 404 for everything else, including /metrics.
 	mux.HandleFunc("/", instrument("root", s.handleRoot))
+	return mux
+}
 
-	// Serve /metrics on a separate admin port if configured, otherwise on the main mux.
-	if s.cfg.MetricsPort != "" && s.cfg.MetricsPort != "0" {
-		adminMux := http.NewServeMux()
-		adminMux.Handle("/metrics", promhttp.HandlerFor(metricsRegistry, promhttp.HandlerOpts{
-			Registry:          metricsRegistry,
-			EnableOpenMetrics: true,
-		}))
+// metricsHandler serves /metrics for the dedicated metrics listener.
+func metricsHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.HandlerFor(metricsRegistry, promhttp.HandlerOpts{
+		Registry:          metricsRegistry,
+		EnableOpenMetrics: true,
+	}))
+	return mux
+}
+
+func (s *Server) Start() error {
+	// Register Go + process collectors on our dedicated registry so /metrics
+	// exposes runtime stats in addition to the custom HTTP/scrape metrics.
+	metricsRegistry.MustRegister(
+		collectors.NewGoCollector(),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+	)
+
+	mux := s.publicHandler()
+
+	// /metrics lives on its own listener (METRICS_ADDR, default
+	// 127.0.0.1:9090) and never on the public port, so a reverse proxy in
+	// front of the API cannot expose it by accident.
+	if addr := s.cfg.MetricsAddr; addr != "" && !strings.EqualFold(addr, "off") {
 		go func() {
-			adminSrv := &http.Server{Addr: ":" + s.cfg.MetricsPort, Handler: adminMux, ReadHeaderTimeout: 10 * time.Second}
-			slog.Info("admin/metrics server starting", "addr", adminSrv.Addr)
-			if err := adminSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				slog.Error("admin server failed", "error", err)
+			metricsSrv := &http.Server{Addr: addr, Handler: metricsHandler(), ReadHeaderTimeout: 10 * time.Second}
+			slog.Info("metrics server starting", "addr", metricsSrv.Addr)
+			if err := metricsSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				slog.Error("metrics server failed", "error", err)
 			}
 		}()
 	} else {
-		mux.Handle("/metrics", promhttp.HandlerFor(metricsRegistry, promhttp.HandlerOpts{
-			Registry:          metricsRegistry,
-			EnableOpenMetrics: true,
-		}))
+		slog.Info("metrics listener disabled (METRICS_ADDR=off)")
 	}
 
 	// Wrap the mux with security headers, CORS, gzip, and OpenTelemetry HTTP
@@ -456,11 +502,17 @@ func (s *Server) handleGraphQL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// One budget for the whole HTTP request, shared by every products
+	// field in every batch item, so neither aliases nor batching multiply
+	// the database work a single request may cause.
+	budget := c3xgql.NewRequestBudget(s.cfg.MaxProductsPerRequest, s.cfg.MaxProductQueriesPerRequest)
+
 	// Execute with timeout. M8: This context propagates through gql.Do → resolver →
 	// DB query (via QueryProducts' ctx parameter), so cancellation of the timeout
 	// will cancel in-flight PostgreSQL queries as well.
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(s.cfg.QueryTimeoutSecs)*time.Second)
 	defer cancel()
+	ctx = c3xgql.WithBudget(ctx, budget)
 
 	results := make([]interface{}, len(batch))
 	for i, req := range batch {
@@ -643,6 +695,38 @@ func (s *Server) rateLimitMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		next(w, r)
+	}
+}
+
+// inflightMiddleware bounds concurrent /graphql requests with the s.inflight
+// semaphore. A request waits up to InflightWaitMillis for a slot, then gets
+// 503 + Retry-After instead of queueing on the DB pool until its query
+// timeout. The c3x CLI retries 5xx with backoff, so a brief saturation
+// degrades to a short delay rather than failed lookups.
+func (s *Server) inflightMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if s.inflight == nil {
+			next(w, r)
+			return
+		}
+		select {
+		case s.inflight <- struct{}{}:
+		default:
+			wait := time.NewTimer(time.Duration(s.cfg.InflightWaitMillis) * time.Millisecond)
+			select {
+			case s.inflight <- struct{}{}:
+				wait.Stop()
+			case <-wait.C:
+				w.Header().Set("Retry-After", "1")
+				writeError(w, http.StatusServiceUnavailable, "server_busy", "Server busy, retry shortly")
+				return
+			case <-r.Context().Done():
+				wait.Stop()
+				return
+			}
+		}
+		defer func() { <-s.inflight }()
 		next(w, r)
 	}
 }

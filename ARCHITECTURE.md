@@ -78,8 +78,8 @@ The single root field is `products(filter, limit, offset)`. The resolver lives
 in [internal/graphql/schema.go](internal/graphql/schema.go) and calls into
 [internal/db/queries.go](internal/db/queries.go):
 
-1. `p.Context` (the per-request `context.WithTimeout`) flows directly to `QueryProducts`.
-2. `QueryProducts` builds a dynamic `WHERE` over the JSONB attributes with `$N`-bound args only. No string interpolation, no SQL injection surface.
+1. `p.Context` (the per-request `context.WithTimeout`) flows directly to `QueryProducts`. It also carries the per-request budget: every `products` field must set `vendorName` and `service`, and one HTTP request may run at most `MAX_PRODUCT_QUERIES_PER_REQUEST` products queries returning at most `MAX_PRODUCTS_PER_REQUEST` products, across aliases and batch items.
+2. `QueryProducts` builds a dynamic `WHERE` over the JSONB attributes with `$N`-bound args only. No string interpolation, no SQL injection surface. Attribute equality is JSONB containment (`attributes @> '{"k":"v"}'`) so the GIN index on `attributes` serves it; regex filters use `attributes->>'k' ~ ...`.
 3. Regex filters compile into a 1024-entry LRU cache, bounded at 200 chars.
 4. Every pooled connection has `SET statement_timeout = '300000'` set via `pgxpool.AfterConnect`, so even a rogue regex cannot pin Postgres.
 
@@ -99,8 +99,8 @@ type Scraper interface {
 1. Acquires `pg_try_advisory_lock(hashtext('scrape:<vendor>'))` on a dedicated pool connection. If another run holds it, this process skips with a warning.
 2. Inserts a `scrape_runs` row with `status='running'` and the DB's `now()` timestamp.
 3. Calls `Scraper.Scrape(ctx)`. Each scraper fans out across services with `errgroup.WithContext` + `SetLimit(cfg.ScrapeConcurrency)`. Per-service errors are logged but do not abort siblings; ctx cancellation (SIGTERM) does abort.
-4. `UpsertProducts` writes in 1000-row batches (8-column batch size stays well under Postgres's 65,535 parameter cap).
-5. `DeleteStaleProducts` removes rows whose `updated_at < scrapeStart` (the DB's own `now()`, not wall-clock).
+4. `UpsertProducts` writes in 1000-row batches (8-column batch size stays well under Postgres's 65,535 parameter cap). The `ON CONFLICT ... DO UPDATE` only fires when `prices`, `attributes` or `sku` actually differ, so an unchanged product is not rewritten and `updated_at` means "content last changed". Each batch is also recorded in the narrow, UNLOGGED `scrape_seen (run_id, product_hash)` table.
+5. `DeleteStaleProducts` removes the vendor's rows with `updated_at < scrapeStart` (the DB's own `now()`, not wall-clock) that are not in this run's `scrape_seen` set. It is skipped when any service/region failed, when the product count dropped by half, or when the seen-set is under half the ingested count (a Postgres crash truncates UNLOGGED tables). The run's `scrape_seen` rows are dropped when it ends.
 6. Updates `scrape_runs` with `status`, `products`, `deleted`, optional `error`.
 
 ## Freshness

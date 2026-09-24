@@ -276,7 +276,7 @@ run_exists_test "AWS: S3 storage exists" \
 
 # Azure/GCP tests are conditional -skip if no data has been scraped for that vendor.
 azure_count=$(curl -s -X POST "$API_URL/graphql" -H "Content-Type: application/json" \
-    -d '{"query":"{ products(filter: {vendorName: \"azure\"}, limit: 1) { productHash } }"}' | \
+    -d '{"query":"{ products(filter: {vendorName: \"azure\", service: \"Virtual Machines\"}, limit: 1) { productHash } }"}' | \
     python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d['data']['products']) if d['data'] else 0)" 2>/dev/null || echo "0")
 
 if [ "$azure_count" -gt 0 ]; then
