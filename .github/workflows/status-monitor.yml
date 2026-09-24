@@ -1,0 +1,111 @@
+name: Status monitor
+
+# Polls the public /status endpoint and raises a GitHub issue when a
+# vendor's pricing data is unhealthy. One issue (fixed title + label) is
+# reused while it stays open; it is commented on only when the set of
+# unhealthy vendors changes, so a long outage does not spam. Close the
+# issue once fixed; the next unhealthy run opens a fresh one.
+
+on:
+  schedule:
+    - cron: "17 */3 * * *" # every 3 hours (off the hour to dodge the cron rush)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: status-monitor
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      STATUS_URL: https://pricing.c3x.dev/status
+      ISSUE_TITLE: "Pricing API: vendor data unhealthy"
+      ISSUE_LABEL: status-monitor
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Fetch /status
+        id: status
+        run: |
+          set -euo pipefail
+          if body="$(curl -fsS --retry 3 --retry-delay 15 --retry-all-errors --max-time 30 \
+                -H 'Accept: application/json' -A 'c3x-status-monitor (GitHub Actions)' "$STATUS_URL")" \
+             && echo "$body" | jq -e '.vendors | type == "object"' > /dev/null; then
+            echo "$body" | jq . | tee status.json
+            # Healthy = ready or scraping. failed/stale/empty/never mean the
+            # served prices are frozen, old or missing.
+            jq -r '.vendors | to_entries[]
+                   | select(.value.status as $s | ["ready","scraping"] | index($s) | not)
+                   | "\(.key)=\(.value.status)"' status.json | sort > unhealthy.txt
+          else
+            echo "status endpoint unreachable or returned an unexpected body" | tee status.json
+            echo "status-endpoint=unreachable" > unhealthy.txt
+          fi
+          if [ -s unhealthy.txt ]; then
+            echo "healthy=false" >> "$GITHUB_OUTPUT"
+            echo "state=$(paste -sd, unhealthy.txt)" >> "$GITHUB_OUTPUT"
+          else
+            echo "healthy=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open or update issue
+        if: steps.status.outputs.healthy == 'false'
+        env:
+          STATE: ${{ steps.status.outputs.state }}
+        run: |
+          set -euo pipefail
+          marker="<!-- status-state: ${STATE} -->"
+          {
+            echo "The scheduled status check found unhealthy pricing data at $(date -u +%Y-%m-%dT%H:%M:%SZ)."
+            echo
+            echo "| Vendor | Status |"
+            echo "|---|---|"
+            tr '=' ' ' < unhealthy.txt | while read -r vendor status; do echo "| \`$vendor\` | **$status** |"; done
+            echo
+            echo "Status meanings: \`failed\` = latest scrape failed (served data frozen), \`stale\` = nothing finished in 48h, \`empty\` = last successful scrape ingested 0 products, \`never\` = no scrape has run."
+            echo
+            echo "<details><summary>/status response</summary>"
+            echo
+            echo '```json'
+            cat status.json
+            echo '```'
+            echo "</details>"
+            echo
+            echo "Run: $RUN_URL"
+            echo
+            echo "$marker"
+          } > report.md
+
+          gh label create "$ISSUE_LABEL" --color B60205 \
+            --description "Opened by the status monitor workflow" 2>/dev/null || true
+
+          number="$(gh issue list --state open --label "$ISSUE_LABEL" --limit 50 --json number,title \
+            --jq "map(select(.title == \"$ISSUE_TITLE\")) | first | .number // empty")"
+
+          if [ -z "$number" ]; then
+            gh issue create --title "$ISSUE_TITLE" --label "$ISSUE_LABEL" --body-file report.md
+            exit 0
+          fi
+
+          last="$(gh issue view "$number" --json body,comments \
+            --jq '[.body] + [.comments[].body] | map(select(contains("<!-- status-state:"))) | last // ""')"
+          if printf '%s' "$last" | grep -qF "$marker"; then
+            echo "issue #$number already reports ${STATE}; not commenting again"
+          else
+            gh issue comment "$number" --body-file report.md
+          fi
+
+      - name: Fail when unhealthy
+        if: steps.status.outputs.healthy == 'false'
+        env:
+          STATE: ${{ steps.status.outputs.state }}
+        run: |
+          echo "::error::Unhealthy vendors: ${STATE}"
+          exit 1
