@@ -55,6 +55,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   set is lost or incomplete.
 
 ### Fixed
+- AWS products in eu-south-2, eu-central-2, mx-central-1, ap-east-2 and
+  ap-southeast-6 were stored under their display name ("Europe (Spain)")
+  instead of their region code, because AWS renamed or added the
+  locations and the name map didn't know them, so no lookup for those
+  regions could match. The scraper now takes the offer file's own
+  `regionCode` for products in a region proper (Local Zones, Wavelength
+  and Outposts keep their location name, so they are not folded into
+  their parent region), with the name map as the fallback. The rows
+  stored under the old names are removed by the stale-row cleanup on the
+  next full scrape.
 - The compose scraper overlay called `/app/c3x-pricing-api`, but the image
   installs the binary at `/usr/local/bin`, and computed its next run with
   GNU/BSD `date` flags that the Alpine image's BusyBox `date` rejects, so
