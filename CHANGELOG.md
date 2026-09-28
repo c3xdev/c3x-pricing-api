@@ -55,6 +55,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   set is lost or incomplete.
 
 ### Fixed
+- The AWS scraper no longer requests `AmazonElasticBeanstalk`, which has
+  no offer file (HTTP 404). Its failure counted as a failed service on
+  every AWS scrape, and a failed service skips the stale-row cleanup, so
+  AWS rows that disappear upstream (such as the five regions previously
+  stored under their display names) were never removed.
 - The scraper compose overlay failed to build (`lstat /Dockerfile`): its
   `build: ../..` resolves against the project directory, not the overlay
   file's, so it pointed outside the checkout. It now builds from `.`. The
