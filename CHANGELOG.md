@@ -63,6 +63,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   set is lost or incomplete.
 
 ### Fixed
+- `azurerm_api_management` prices the tier and unit count in `sku_name`
+  and pins the unit meter. `Premium_3` and `Standard_2` fell through to
+  one Standard unit, `Basic_1` was priced as the Basic v2 SKU, the v2
+  tiers were unrecognised, and the unmatched meter filter could land on
+  the cheaper Workspace Pack meter ($100/mo for Standard_1; it is
+  $686.71). Consumption has no unit charge and gets no line.
 - The AWS scraper no longer requests `AmazonElasticBeanstalk`, which has
   no offer file (HTTP 404). Its failure counted as a failed service on
   every AWS scrape, and a failed service skips the stale-row cleanup, so
