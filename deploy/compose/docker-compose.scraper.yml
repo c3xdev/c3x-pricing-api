@@ -3,7 +3,11 @@
 #   docker compose -f docker-compose.yml -f deploy/compose/docker-compose.scraper.yml up -d
 services:
   scraper:
-    build: ../..
+    # Relative paths in an extra -f file resolve against the project
+    # directory (the first file's, i.e. the repo root), not this file's,
+    # so the build context is "." here. "../.." pointed at the parent of
+    # the checkout and the build failed with "lstat /Dockerfile".
+    build: .
     # Simple cron loop: sleep until 03:00 UTC, run scrape, repeat. No external
     # cron daemon needed. The next-run time is plain shell arithmetic because
     # the runtime image is Alpine, whose BusyBox `date` has neither GNU
@@ -42,7 +46,11 @@ services:
       GOMEMLIMIT: "${SCRAPER_GOMEMLIMIT:-7GiB}"
     # The EC2 price files are parsed one region at a time per worker, at
     # 0.5-1.5 GB each, so peak memory scales with SCRAPE_CONCURRENCY. Raise
-    # this together with SCRAPE_CONCURRENCY.
+    # this together with SCRAPE_CONCURRENCY. On a small host keep the limit
+    # below the machine's RAM minus the database's share, e.g. on 4 GB:
+    # SCRAPER_MEM_LIMIT=3g SCRAPER_GOMEMLIMIT=2500MiB SCRAPE_CONCURRENCY=1.
+    # `docker compose run api scrape` is NOT a substitute: it inherits the
+    # api service's 1 GB limit, and an AWS scrape is OOM-killed.
     deploy:
       resources:
         limits:

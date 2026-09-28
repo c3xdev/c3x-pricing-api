@@ -55,6 +55,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   set is lost or incomplete.
 
 ### Fixed
+- The scraper compose overlay failed to build (`lstat /Dockerfile`): its
+  `build: ../..` resolves against the project directory, not the overlay
+  file's, so it pointed outside the checkout. It now builds from `.`. The
+  compose README documents sizing the scraper for small hosts and that
+  `docker compose run api scrape` inherits the API's 1 GB limit, which an
+  AWS scrape exceeds.
 - Azure: rows Azure flags `isPrimaryMeterRegion=false` are ingested when
   they are the only row for their price. Azure lists a meter under every
   region it is sold in but makes one region (often "Global") its primary;
