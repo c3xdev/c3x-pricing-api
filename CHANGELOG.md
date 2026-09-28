@@ -31,6 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Memory limits for the `db` (2g), `api` (1g) and `scraper` (8g) compose
   services, overridable via `DB_MEM_LIMIT` / `API_MEM_LIMIT` /
   `SCRAPER_MEM_LIMIT`, with a matching `GOMEMLIMIT` for the Go processes.
+- `catalog/gcp/google_cloud_run_v2_job.toml`: Cloud Run Jobs priced against
+  the already-scraped `Jobs CPU in <region>` / `Jobs Memory in <region>`
+  SKUs. The kind previously had no catalog entry at all, so every client
+  priced it as free. Jobs bill instance-based (no idle/active split, no
+  free tier), and the SKUs are per-region only, so the mapping sets
+  `region = "global"` and folds the resource's `location` into the
+  `description` filter instead of relying on `PriceMapping.Region`, which
+  only accepts a static string.
 
 ### Changed
 - `/metrics` is no longer served on the public port. It is only on its own
