@@ -35,7 +35,10 @@ var awsServices = []string{
 	"AmazonECS",
 	"AmazonEKS",
 	"AmazonLightsail",
-	"AmazonElasticBeanstalk",
+	// AmazonElasticBeanstalk: no offer file (HTTP 404, and absent from the
+	// offer index, as of 2026-09-28); Beanstalk has no charge of its own,
+	// only the resources it creates. Listing it failed every AWS scrape,
+	// and one failed service disables the vendor's stale-row cleanup.
 	"CodeBuild",
 	"AWSAppRunner",     // App Runner (vCPU/memory hours, build minutes)
 	"ElasticMapReduce", // EMR service charge per-node-hour
