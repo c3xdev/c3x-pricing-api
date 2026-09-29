@@ -63,6 +63,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   set is lost or incomplete.
 
 ### Fixed
+- Azure scraper: Virtual Machines products named "... Cloud Services" /
+  "... CloudServices" (Cloud Services roles, billed at the Windows rate)
+  no longer get `os = "Linux"`; they carry no `os`. They share the VM's
+  `armSkuName`, so a Linux lookup could quote them: Standard_B2s_v2 in
+  westeurope at $0.105/h instead of $0.096/h, Standard_D2as_v5 at
+  $0.196/h instead of $0.104/h. Products ending in " Win" (for example
+  "Virtual Machines NCCadsv5 Srs Win") are now `os = "Windows"`.
+- Catalog: Azure VM-sized mappings (`azurerm_linux_virtual_machine`,
+  `azurerm_windows_virtual_machine`, `azurerm_virtual_machine`, the three
+  scale sets, `azurerm_kubernetes_cluster` and `_node_pool`,
+  `azurerm_batch_pool`) filter on `armSkuName` instead of `skuName`.
+  Azure's `skuName` is "Standard_D2s_v5" for some series but "B2s",
+  "B2s v2" or "D2 v3" for most, so about 1,250 of 1,716 sizes in
+  westeurope (all B-series among them) matched no price.
+- Catalog: `aws_lambda_function` prices `architectures = ["arm64"]` at the
+  Arm duration rate ($0.0000133334 vs $0.0000166667 per GB-second in
+  us-east-1). The list was compared to the string "arm64", which never
+  matched. Provisioned concurrency had the same bug.
+- Catalog: `google_sql_database_instance` picks the SKU for the
+  instance's region. SKU names end in a per-region location ("vCPU in
+  Frankfurt", "in EMEA", "in Northern Virginia"), and the mapping only
+  asked for "in Americas", so every region other than us-central1,
+  us-central2, us-east1 and us-west1 fell back to us-central1 rates.
 - `azurerm_api_management` prices the tier and unit count in `sku_name`
   and pins the unit meter. `Premium_3` and `Standard_2` fell through to
   one Standard unit, `Basic_1` was priced as the Basic v2 SKU, the v2

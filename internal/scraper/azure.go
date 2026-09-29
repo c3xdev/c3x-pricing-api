@@ -596,9 +596,9 @@ func (s *AzureScraper) fetchPage(ctx context.Context, pageURL string) (*azureRes
 // azureAttributes builds the product attribute map, deriving
 // normalised discriminators the raw feed lacks.
 //
-// Virtual Machines: Linux and Windows rates share skuName/meterName
+// Virtual Machines: Linux and Windows rates share armSkuName/meterName
 // and differ only by a " Windows" productName suffix — without an
-// explicit `os` attribute, a consumer filtering on skuName alone
+// explicit `os` attribute, a consumer filtering on the size alone
 // gets both rows and (worse) any max-price picker quotes the
 // Windows rate for a Linux VM.
 func azureAttributes(serviceName, productName, skuName, meterName, armSkuName, serviceFamily string) map[string]string {
@@ -610,11 +610,28 @@ func azureAttributes(serviceName, productName, skuName, meterName, armSkuName, s
 		"serviceFamily": serviceFamily,
 	}
 	if serviceName == "Virtual Machines" {
-		if strings.HasSuffix(productName, " Windows") {
+		switch {
+		case isAzureCloudServices(productName):
+			// Cloud Services roles ("Bsv2 Series Cloud Services") reuse
+			// the VM armSkuName and meterName but bill at the Windows
+			// rate. Labelling them Linux put them in every Linux VM
+			// match, and a highest-price consumer quoted them: Standard_B2s_v2
+			// at $0.105/h instead of $0.096/h in westeurope. They are
+			// not virtual machines of either OS, so they carry no os.
+		case strings.HasSuffix(productName, " Windows"), strings.HasSuffix(productName, " Win"):
+			// " Win" is the abbreviated form some series use
+			// ("Virtual Machines NCCadsv5 Srs Win").
 			attrs["os"] = "Windows"
-		} else {
+		default:
 			attrs["os"] = "Linux"
 		}
 	}
 	return attrs
+}
+
+// isAzureCloudServices reports whether a "Virtual Machines" productName
+// is a Cloud Services (classic) product. Azure spells it both ways:
+// "Dasv5 Series Cloud Services" and "Easv5 Series CloudServices".
+func isAzureCloudServices(productName string) bool {
+	return strings.Contains(productName, "Cloud Services") || strings.Contains(productName, "CloudServices")
 }
