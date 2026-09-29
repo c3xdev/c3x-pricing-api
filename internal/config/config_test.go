@@ -95,8 +95,8 @@ func TestLoad_RequestLimitDefaults(t *testing.T) {
 	if c.MaxBatchSize != 50 {
 		t.Errorf("MaxBatchSize=%d, want 50", c.MaxBatchSize)
 	}
-	if c.MaxProductsPerRequest != 1000 {
-		t.Errorf("MaxProductsPerRequest=%d, want 1000", c.MaxProductsPerRequest)
+	if c.MaxProductsPerRequest != 5000 {
+		t.Errorf("MaxProductsPerRequest=%d, want 5000", c.MaxProductsPerRequest)
 	}
 	if c.MaxProductQueriesPerRequest != 50 {
 		t.Errorf("MaxProductQueriesPerRequest=%d, want 50", c.MaxProductQueriesPerRequest)

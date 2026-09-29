@@ -11,11 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-request query cost limits on `/graphql`. A `products` query must set
   both `vendorName` and `service`; one HTTP request may run at most
   `MAX_PRODUCT_QUERIES_PER_REQUEST` (50) products queries returning at most
-  `MAX_PRODUCTS_PER_REQUEST` (1000) products, summed over aliases and batch
+  `MAX_PRODUCTS_PER_REQUEST` (5000) products, summed over aliases and batch
   items (a field's `limit` is clamped to what is left). Previously a single
   request under the per-IP rate limit could fan out into hundreds of
-  full-JSONB scans. The c3x CLI sends one query per request with both
-  filters and `limit:50`, so it is unaffected.
+  full-JSONB scans. The c3x CLI's lookups send one query with both filters
+  and `limit:50`; its `pricing sync` pages 5,000 products at a time.
 - Global in-flight limit for `/graphql` (`MAX_INFLIGHT_REQUESTS`, default
   DB pool size minus 2). A request that finds no slot within
   `INFLIGHT_WAIT_MS` (250) gets `503` with `Retry-After: 1` instead of
@@ -86,6 +86,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Frankfurt", "in EMEA", "in Northern Virginia"), and the mapping only
   asked for "in Americas", so every region other than us-central1,
   us-central2, us-east1 and us-west1 fell back to us-central1 rates.
+- The default `MAX_PRODUCTS_PER_REQUEST` is 5000, up from 1000. The c3x
+  CLI's `pricing sync` pages through the catalog 5,000 products at a time,
+  and released CLIs took a shorter page as the last one, so with the
+  1,000 cap they synced only the first 1,000 products of each service and
+  region and `estimate --offline` priced most resources at $0. 5,000 is
+  one enumeration page; ordinary lookups use `limit:50`.
 - `azurerm_api_management` prices the tier and unit count in `sku_name`
   and pins the unit meter. `Premium_3` and `Standard_2` fell through to
   one Standard unit, `Basic_1` was priced as the Basic v2 SKU, the v2
