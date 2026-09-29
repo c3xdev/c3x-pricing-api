@@ -40,7 +40,7 @@ services:
       # Query cost limits. The c3x CLI sends one products query per request
       # (limit:50) and never batches, so these sit well above its needs.
       MAX_BATCH_SIZE: ${MAX_BATCH_SIZE:-50}
-      MAX_PRODUCTS_PER_REQUEST: ${MAX_PRODUCTS_PER_REQUEST:-1000}
+      MAX_PRODUCTS_PER_REQUEST: ${MAX_PRODUCTS_PER_REQUEST:-5000}
       MAX_PRODUCT_QUERIES_PER_REQUEST: ${MAX_PRODUCT_QUERIES_PER_REQUEST:-50}
       # Concurrent /graphql requests; 0 = DB pool size minus 2. Excess
       # requests wait INFLIGHT_WAIT_MS, then get 503 + Retry-After.

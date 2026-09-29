@@ -107,7 +107,7 @@ func Load() *Config {
 		Env:         getEnv("ENV", "development"),
 		MetricsAddr: metricsAddr(),
 
-		MaxProductsPerRequest:       getEnvInt("MAX_PRODUCTS_PER_REQUEST", 1000),
+		MaxProductsPerRequest:       getEnvInt("MAX_PRODUCTS_PER_REQUEST", 5000),
 		MaxProductQueriesPerRequest: getEnvInt("MAX_PRODUCT_QUERIES_PER_REQUEST", 50),
 		MaxInflightRequests:         getEnvInt("MAX_INFLIGHT_REQUESTS", 0),
 		InflightWaitMillis:          getEnvInt("INFLIGHT_WAIT_MS", 250),

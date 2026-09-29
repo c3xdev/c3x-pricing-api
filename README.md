@@ -95,7 +95,7 @@ table.
 | `SCRAPE_CONCURRENCY_GCP` | `0` | GCP-specific override (0 = inherit global) |
 | `MAX_REQUEST_BODY_MB` | `4` | Maximum request body size in MB |
 | `MAX_BATCH_SIZE` | `50` | Maximum number of queries per batch request |
-| `MAX_PRODUCTS_PER_REQUEST` | `1000` | Products returned per HTTP request, summed over all `products` fields (aliases) and batch items. A field's limit is clamped to what is left; once spent, further fields error |
+| `MAX_PRODUCTS_PER_REQUEST` | `5000` | Products returned per HTTP request, summed over all `products` fields (aliases) and batch items. A field's limit is clamped to what is left; once spent, further fields error |
 | `MAX_PRODUCT_QUERIES_PER_REQUEST` | `50` | `products` fields (each one a DB query) per HTTP request, across aliases and batch items |
 | `MAX_INFLIGHT_REQUESTS` | `0` | Concurrent `/graphql` requests. `0` = DB pool max minus 2 (min 1), `-1` = unbounded |
 | `INFLIGHT_WAIT_MS` | `250` | How long a request waits for an in-flight slot before `503` + `Retry-After` |
