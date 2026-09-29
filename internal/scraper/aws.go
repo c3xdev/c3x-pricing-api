@@ -52,6 +52,7 @@ var awsServices = []string{
 	"AmazonES",       // OpenSearch/Elasticsearch
 	"AmazonDAX",      // DynamoDB Accelerator
 	"AmazonMemoryDB", // MemoryDB for Redis
+	"AmazonMCS",      // Keyspaces (for Apache Cassandra)
 	// Storage
 	"AmazonS3",
 	"AmazonEFS",
