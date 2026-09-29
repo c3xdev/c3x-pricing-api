@@ -110,6 +110,19 @@ func TestAzureVMOSDiscriminator(t *testing.T) {
 	if win["os"] != "Windows" {
 		t.Errorf("os = %q, want Windows", win["os"])
 	}
+	winShort := azureAttributes("Virtual Machines", "Virtual Machines NCCadsv5 Srs Win", "NCC40adsH100v5", "NCC40adsH100v5", "Standard_NCC40ads_H100_v5", "Compute")
+	if winShort["os"] != "Windows" {
+		t.Errorf("os = %q, want Windows for the abbreviated \" Win\" suffix", winShort["os"])
+	}
+	// Cloud Services roles share the VM's armSkuName but bill at the
+	// Windows rate; labelled Linux they outbid the real Linux VM row
+	// for a highest-price consumer filtering on armSkuName + os.
+	for _, product := range []string{"Bsv2 Series Cloud Services", "Easv5 Series CloudServices"} {
+		cs := azureAttributes("Virtual Machines", product, "B2s v2", "B2s v2", "Standard_B2s_v2", "Compute")
+		if os, ok := cs["os"]; ok {
+			t.Errorf("%s: os = %q, want no os attribute", product, os)
+		}
+	}
 	other := azureAttributes("Azure Cosmos DB", "Azure Cosmos DB", "RUs", "100 RU/s", "", "Databases")
 	if _, ok := other["os"]; ok {
 		t.Error("non-VM services must not carry an os attribute")
