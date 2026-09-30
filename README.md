@@ -21,14 +21,16 @@ cp .env.example .env
 # Start with Docker Compose
 docker compose up -d
 
-# Scrape pricing data
-docker compose exec api ./c3x-pricing-api scrape --vendor aws
-docker compose exec api ./c3x-pricing-api scrape --vendor azure
-docker compose exec api ./c3x-pricing-api scrape --vendor gcp
-
-# ...or scrape all three:
-docker compose exec api ./c3x-pricing-api scrape --vendor all
+# Scrape pricing data: each vendor in its own container, with enough
+# memory for AWS (3 GB by default; see deploy/scrape.sh)
+deploy/scrape.sh                 # aws, azure and gcp
+deploy/scrape.sh azure           # or a subset
 ```
+
+Don't scrape with `docker compose exec api ...`: that runs inside the API
+container under its 1 GB limit, where an AWS scrape runs out of memory and
+can take the API down with it. To scrape nightly, add to your crontab:
+`0 3 * * * /path/to/c3x-pricing-api/deploy/scrape.sh >> /var/log/c3x-pricing-scrape.log 2>&1`.
 
 The API will be available at `http://localhost:4000/graphql`.
 
