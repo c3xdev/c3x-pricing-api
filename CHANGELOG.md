@@ -63,6 +63,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   set is lost or incomplete.
 
 ### Fixed
+- `deploy/scrape.sh` scrapes each vendor in its own short-lived container
+  with its own memory limit (3 GB by default), for cron. The README's quick
+  start ran scrapes with `docker compose exec api`, inside the API
+  container and its 1 GB limit, where an AWS scrape runs out of memory
+  (and can take the API down with it); a cron job chaining vendors with
+  `&&` also stopped at the first failure. The README now points to the
+  script.
 - Azure scraper: Virtual Machines products named "... Cloud Services" /
   "... CloudServices" (Cloud Services roles, billed at the Windows rate)
   no longer get `os = "Linux"`; they carry no `os`. They share the VM's
