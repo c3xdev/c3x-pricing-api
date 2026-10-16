@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-16
+
 ### Added
 - Per-request query cost limits on `/graphql`. A `products` query must set
   both `vendorName` and `service`; one HTTP request may run at most
