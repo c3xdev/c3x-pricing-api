@@ -62,6 +62,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only the vendor's products it did not see. Cleanup is skipped if that
   set is lost or incomplete.
 
+### Security
+- Build on Go 1.27.2 and `golang.org/x/net` v0.60.0, fixing the
+  `net/http`, HTTP/2, `crypto/tls`, `net/textproto` and `html/template`
+  vulnerabilities in Go 1.27.1 and x/net v0.59.0 (GO-2026-6599, -6600,
+  -6603, -6605, -6607, -6608, -6610). The server image, CI and release
+  builds all pinned 1.27.1.
+
 ### Fixed
 - `deploy/scrape.sh` scrapes each vendor in its own short-lived container
   with its own memory limit (3 GB by default), for cron. The README's quick
