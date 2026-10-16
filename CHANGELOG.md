@@ -406,7 +406,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `sslmode=disable/allow/prefer` rejected in production via strict URL parsing.
 - Security headers, CORS allow-list, request-body cap, and per-IP rate limiting.
 
-[Unreleased]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.1.4...v1.2.0
+[1.1.4]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.1.3...v1.1.4
+[1.1.3]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.1.2...v1.1.3
+[1.1.2]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.1.1...v1.1.2
+[1.1.1]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.1.0...v1.1.1
+[1.1.0]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.0.4...v1.1.0
+[1.0.4]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/c3xdev/c3x-pricing-api/compare/v0.1.0...v1.0.2
 [0.1.0]: https://github.com/c3xdev/c3x-pricing-api/releases/tag/v0.1.0
