@@ -7,10 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-23
+
 ### Security
 - Build with Go 1.27.3 (CI, release workflow and `Dockerfile`), which fixes
   GO-2026-6809 in `crypto/x509`: certificate verification trusted
   compromised intermediate certificates. The scraper's HTTPS calls reach it.
+
+### Changed
+- Dependencies: `golang.org/x/sync` 0.24.0, `github.com/exaring/otelpgx`
+  0.13.0.
 
 ## [1.2.0] - 2026-10-16
 
@@ -411,7 +417,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `sslmode=disable/allow/prefer` rejected in production via strict URL parsing.
 - Security headers, CORS allow-list, request-body cap, and per-IP rate limiting.
 
-[Unreleased]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.1.4...v1.2.0
 [1.1.4]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/c3xdev/c3x-pricing-api/compare/v1.1.2...v1.1.3
