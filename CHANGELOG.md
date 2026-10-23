@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Build with Go 1.27.3 (CI, release workflow and `Dockerfile`), which fixes
+  GO-2026-6809 in `crypto/x509`: certificate verification trusted
+  compromised intermediate certificates. The scraper's HTTPS calls reach it.
+
 ## [1.2.0] - 2026-10-16
 
 ### Added
